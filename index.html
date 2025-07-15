@@ -39,7 +39,7 @@
   </div>
 
   <!-- status label -->
-  <div id="status">Searching…2023</div>
+  <div id="status">Searching…2022</div>
 
   <!-- AR scene -->
   <a-scene
@@ -47,10 +47,7 @@
     arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled:false;"
   >
     <!-- custom pattern, id so JS can listen -->
-    <a-marker id="customMarker"
-              type="pattern"
-              url="hiro_marker.patt"
-              emitevents="true">
+    <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-box id="cube"
              position="0 0.15 0"
              scale="0.3 0.3 0.3"
@@ -81,7 +78,7 @@
 
     marker.addEventListener('markerLost', () => {
       cube.setAttribute('visible', false);
-      status.textContent = 'Searching…2023';
+      status.textContent = 'Searching…2022';
     });
   </script>
 </body>
