@@ -2,19 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node signalling network</title>
+  <title>Cubic cell – 50‑node network (slow & resettable)</title>
 
-  <!-- A‑Frame + AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
-
-  <!-- thick 3‑D lines -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-meshline@1.2.0/dist/aframe-meshline.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{margin:0;overflow:hidden}
-    #status{position:fixed;top:10px;left:10px;font:24px monospace;color:#fff;z-index:1000}
+    body{margin:0;overflow:hidden;font-family:monospace}
+    #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
+    #resetBtn{position:fixed;bottom:12px;left:12px;padding:6px 12px;font:16px monospace;
+              background:#222;color:#fff;border:1px solid #888;border-radius:4px;opacity:0.8;
+              z-index:1000}
     #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
             align-items:center;background:#000}
     .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
@@ -26,6 +26,7 @@
 <body>
   <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
   <div id="status">Searching…</div>
+  <button id="resetBtn">Reset signal</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
@@ -34,214 +35,192 @@
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate (unchanged) -->
+  <!-- drag‑rotate identical to previous version -->
   <script>
-    AFRAME.registerComponent('drag-rotate',{
-      schema:{speed:{default:1}},
-      init(){
-        const cvs=this.el.sceneEl.canvas;
-        this.drag=false;this.px=0;this.py=0;
-        const st=e=>{this.drag=true;this.px=e.clientX;this.py=e.clientY};
-        const mv=(x,y,f=1)=>{if(!this.drag)return;
-          const r=this.el.getAttribute('rotation');
-          this.el.setAttribute('rotation',{
-             x:r.x+(y-this.py)*f*this.data.speed,
-             y:r.y+(x-this.px)*f*this.data.speed,z:r.z});
-          this.px=x;this.py=y;};
-        cvs.addEventListener('mousedown',e=>st(e));
-        window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
-        window.addEventListener('mouseup',()=>this.drag=false);
-        cvs.addEventListener('touchstart',e=>st(e.touches[0]),{passive:false});
-        window.addEventListener('touchmove',e=>{
-          if(this.drag){e.preventDefault();mv(e.touches[0].clientX,e.touches[0].clientY,0.5);}
-        },{passive:false});
-        window.addEventListener('touchend',()=>this.drag=false);
-      }
-    });
+    AFRAME.registerComponent('drag-rotate',{schema:{speed:{default:1}},init(){
+      const cvs=this.el.sceneEl.canvas;let drag=false,px=0,py=0;
+      const st=e=>{drag=true;px=e.clientX;py=e.clientY};
+      const mv=(x,y,f=1)=>{if(!drag)return;
+        const r=this.el.getAttribute('rotation');
+        this.el.setAttribute('rotation',{x:r.x+(y-py)*f*this.data.speed,
+                                         y:r.y+(x-px)*f*this.data.speed,z:r.z});
+        px=x;py=y;};
+      cvs.addEventListener('mousedown',e=>st(e));
+      window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+      window.addEventListener('mouseup',()=>drag=false);
+      cvs.addEventListener('touchstart',e=>st(e.touches[0]),{passive:false});
+      window.addEventListener('touchmove',e=>{if(drag){e.preventDefault();
+        mv(e.touches[0].clientX,e.touches[0].clientY,0.5);}}, {passive:false});
+      window.addEventListener('touchend',()=>drag=false);
+    }});
   </script>
 
-  <!-- build the cell interior & network -->
   <script>
+    /* scene handles */
     const scene      = document.querySelector('a-scene');
     const marker     = document.getElementById('hiroMarker');
     const cellEntity = document.getElementById('cell');
     const statusTxt  = document.getElementById('status');
     const loader     = document.getElementById('loader');
+    const resetBtn   = document.getElementById('resetBtn');
 
-    /* --- build static organelles ---------------------------------------------------- */
-    function addStaticOrganelles() {
+    /* constants */
+    const N_NODES = 50;
+    const PROP_INTERVAL = 1200;          // ms between waves (slower)
+
+    /* data structures */
+    const nodes = [];    // [{id:'n0',x,y,z,el}]
+    const edges = [];    // [{id:'e0',a,b,el}]
+    let timers  = [];
+
+    /* ---------- build static organelles ------------------------------------------ */
+    function addOrganelles(){
       /* membrane cube */
-      const mem = document.createElement('a-box');
-      mem.setAttribute('width','1.6');
-      mem.setAttribute('height','1.6');
-      mem.setAttribute('depth','1.6');
-      mem.setAttribute('material','color:#00ffff;opacity:0.10;transparent:true;side:double');
-      cellEntity.appendChild(mem);
+      cellEntity.insertAdjacentHTML('beforeend',
+        `<a-box width="1.6" height="1.6" depth="1.6"
+                material="color:#00ffff;opacity:0.10;transparent:true;side:double"></a-box>`);
 
       /* nucleus */
-      const nuc = document.createElement('a-sphere');
-      nuc.setAttribute('radius','0.45');
-      nuc.setAttribute('material','color:#800080;opacity:0.50;transparent:true');
-      cellEntity.appendChild(nuc);
+      cellEntity.insertAdjacentHTML('beforeend',
+        `<a-sphere radius="0.45"
+                   material="color:#800080;opacity:0.50;transparent:true"></a-sphere>`);
 
-      /* Golgi (three plates) */
-      const golgiData=[
+      /* Golgi */
+      const golgi=[
         {w:.55,d:.32,y:.25,c:'#cd853f'},
         {w:.42,d:.26,y:.17,c:'#d2b48c'},
         {w:.34,d:.22,y:.09,c:'#deb887'}
       ];
-      golgiData.forEach(g=>{
-        const plate=document.createElement('a-box');
-        plate.setAttribute('width',g.w);
-        plate.setAttribute('height',0.05);
-        plate.setAttribute('depth',g.d);
-        plate.setAttribute('position',`-0.55 ${g.y} 0`);
-        plate.setAttribute('material',`color:${g.c};opacity:0.80`);
-        cellEntity.appendChild(plate);
+      golgi.forEach(g=>{
+        cellEntity.insertAdjacentHTML('beforeend',
+          `<a-box width="${g.w}" height="0.05" depth="${g.d}"
+                  position="-0.55 ${g.y} 0"
+                  material="color:${g.c};opacity:0.80"></a-box>`);
       });
 
       /* mitochondria */
-      const mitoInfo=[
+      const mito=[
         {pos:'0.55 -0.33 0.25',rot:'0 0 90'},
         {pos:'0.48 0.40 -0.30',rot:'60 30 20'}
       ];
-      mitoInfo.forEach(m=>{
-        const cyl=document.createElement('a-cylinder');
-        cyl.setAttribute('radius','0.12');
-        cyl.setAttribute('height','0.45');
-        cyl.setAttribute('position',m.pos);
-        cyl.setAttribute('rotation',m.rot);
-        cyl.setAttribute('material','color:#ff8c00;opacity:0.85');
-        cellEntity.appendChild(cyl);
+      mito.forEach(m=>{
+        cellEntity.insertAdjacentHTML('beforeend',
+          `<a-cylinder radius="0.12" height="0.45" position="${m.pos}" rotation="${m.rot}"
+                       material="color:#ff8c00;opacity:0.85"></a-cylinder>`);
       });
     }
 
-    /* --- build 50‑node network ------------------------------------------------------ */
-    const N_NODES = 50;
-    const nodePositions = [];            // [ {id:'n0', x,y,z}, ... ]
-    const edges = [];                     // [ {id:'e0', a:0, b:7}, ... ]
-    const visited = new Set();           // BFS propagation
-
+    /* ---------- build network ----------------------------------------------------- */
     function rnd(min,max){return Math.random()*(max-min)+min;}
 
-    function buildNetwork() {
-      /* receptor on TOP face */
-      nodePositions.push({id:'n0',x:0,y:0.80,z:0});  // first node
-
-      /* random scatter inside cube */
-      while(nodePositions.length < N_NODES){
-        const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
-        nodePositions.push({id:`n${nodePositions.length}`,x,y,z});
+    function buildNetwork(){
+      /* node positions */
+      nodes.push({id:'n0',x:0,y:0.80,z:0});     // receptor on top face
+      while(nodes.length<N_NODES){
+        const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
+        nodes.push({id:`n${nodes.length}`,x,y,z});
       }
 
-      /* create node entities */
-      nodePositions.forEach(n=>{
-        const s=document.createElement('a-sphere');
-        s.setAttribute('id',n.id);
-        s.setAttribute('radius','0.06');
-        s.setAttribute('color','#888');
-        s.setAttribute('position',`${n.x} ${n.y} ${n.z}`);
-        cellEntity.appendChild(s);
+      /* add node entities */
+      nodes.forEach(n=>{
+        cellEntity.insertAdjacentHTML('beforeend',
+          `<a-sphere id="${n.id}" radius="0.06" color="#888"
+                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+        n.el=document.getElementById(n.id);
       });
 
-      /* simple neighbour graph: each node connects to its 3 closest later nodes */
-      for(let i=0;i<N_NODES;i++){
-        const n=nodePositions[i];
-        const dists=nodePositions.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}));
-        dists.sort((a,b)=>a.dist-b.dist);
+      /* edges: each node → 3 nearest later nodes */
+      nodes.forEach((n,i)=>{
+        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+                         .sort((a,b)=>a.dist-b.dist);
         let added=0;
-        for(let k=1;k<dists.length && added<3;k++){     // skip k=0 (itself)
-          const j=dists[k].j;
-          if(j<i) continue;                             // create edge only once
-          edges.push({id:`e${edges.length}`,a:i,b:j});
+        for(let k=1;k<dists.length && added<3;k++){
+          const j=dists[k].j; if(j<i) continue;
+          const id=`e${edges.length}`;
+          const line=`${n.x} ${n.y} ${n.z}, ${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
+          cellEntity.insertAdjacentHTML('beforeend',
+            `<a-entity id="${id}" meshline="lineWidth:8;path:${line};color:#666"></a-entity>`);
+          edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
-      }
-
-      /* create edge entities with meshline */
-      edges.forEach(e=>{
-        const a=nodePositions[e.a], b=nodePositions[e.b];
-        const el=document.createElement('a-entity');
-        el.setAttribute('id',e.id);
-        el.setAttribute('meshline',`lineWidth:8; path:${a.x} ${a.y} ${a.z}, ${b.x} ${b.y} ${b.z}; color:#666`);
-        cellEntity.appendChild(el);
       });
     }
 
-    /* --- signal propagation --------------------------------------------------------- */
-    let timers=[];
-    function bfsPropagation(){
-      /* breadth‑first from node 0 */
-      const queue=[[0]];
-      visited.clear(); visited.add(0);
-      while(queue[queue.length-1].length){
+    /* ---------- propagation logic ------------------------------------------------- */
+    function propagate(){
+      /* clear previous timers */
+      timers.forEach(clearTimeout); timers=[];
+      /* reset colours first */
+      nodes.forEach(n=>n.el.setAttribute('color','#888'));
+      edges.forEach(e=>e.el.setAttribute('meshline',
+         e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:#666')));
+
+      /* breadth‑first waves */
+      const visited=new Set([0]);
+      const waves=[[0]];
+      while(waves[waves.length-1].length){
         const wave=[];
-        queue[queue.length-1].forEach(i=>{
+        waves[waves.length-1].forEach(i=>{
           edges.forEach(e=>{
-            const nb = (e.a===i ? e.b : e.b===i ? e.a : null);
+            const nb=(e.a===i?e.b:e.b===i?e.a:null);
             if(nb!==null && !visited.has(nb)){
               visited.add(nb); wave.push(nb);
             }
           });
         });
-        if(wave.length) queue.push(wave);
-        else break;
+        if(wave.length) waves.push(wave); else break;
       }
 
-      /* animate waves */
-      queue.forEach((wave,w)=>{
+      waves.forEach((wave,w)=>{
         timers.push(setTimeout(()=>{
-          wave.forEach(i=>{
-            document.getElementById(nodePositions[i].id)
-                    .setAttribute('color','#ff0000');
-          });
-          /* edges turn red when BOTH ends already red */
+          /* colour nodes */
+          wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
+
+          /* colour edges whose ends are red */
           edges.forEach(e=>{
-            const na=document.getElementById(nodePositions[e.a].id);
-            const nb=document.getElementById(nodePositions[e.b].id);
-            if(na.getAttribute('color')==='#ff0000' && nb.getAttribute('color')==='#ff0000'){
-              document.getElementById(e.id).setAttribute('meshline',
-                 `lineWidth:8; color:#ff0000; path:`+
-                 `${na.object3D.position.x} ${na.object3D.position.y} ${na.object3D.position.z},`+
-                 `${nb.object3D.position.x} ${nb.object3D.position.y} ${nb.object3D.position.z}`);
+            const cA=nodes[e.a].el.getAttribute('color');
+            const cB=nodes[e.b].el.getAttribute('color');
+            if(cA==='#ff0000'&&cB==='#ff0000'){
+              const ml=e.el.getAttribute('meshline');
+              e.el.setAttribute('meshline',ml.replace(/color:[^;]+/,'color:#ff0000'));
             }
           });
-        },w*600));
-      });
-    }
-    function resetNetwork(){
-      timers.forEach(clearTimeout); timers=[];
-      nodePositions.forEach(n=>{
-        const s=document.getElementById(n.id);
-        if(s) s.setAttribute('color','#888');
-      });
-      edges.forEach(e=>{
-        const line=document.getElementById(e.id);
-        if(line){
-          const a=nodePositions[e.a], b=nodePositions[e.b];
-          line.setAttribute('meshline',
-            `lineWidth:8; color:#666; path:${a.x} ${a.y} ${a.z}, ${b.x} ${b.y} ${b.z}`);
-        }
+        },w*PROP_INTERVAL));
       });
     }
 
-    /* --- build once scene has loaded ------------------------------------------------ */
+    function resetNetwork(){
+      timers.forEach(clearTimeout); timers=[];
+      nodes.forEach(n=>n.el.setAttribute('color','#888'));
+      edges.forEach(e=>{
+        const ml=e.el.getAttribute('meshline');
+        e.el.setAttribute('meshline',ml.replace(/color:[^;]+/,'color:#666'));
+      });
+    }
+
+    /* ---------- build scene once loaded ------------------------------------------- */
     scene.addEventListener('loaded',()=>{
       loader.style.display='none';
-      addStaticOrganelles();
+      addOrganelles();
       buildNetwork();
     });
 
-    /* --- marker events -------------------------------------------------------------- */
+    /* ---------- marker events ----------------------------------------------------- */
     marker.addEventListener('markerFound',()=>{
       cellEntity.setAttribute('visible',true);
       statusTxt.textContent='Success';
-      bfsPropagation();
+      propagate();
     });
     marker.addEventListener('markerLost',()=>{
       cellEntity.setAttribute('visible',false);
       statusTxt.textContent='Searching…';
       resetNetwork();
+    });
+
+    /* ---------- manual reset button ---------------------------------------------- */
+    resetBtn.addEventListener('click',()=>{
+      resetNetwork();
+      if(cellEntity.getAttribute('visible')==='true') propagate();
     });
   </script>
 </body>
