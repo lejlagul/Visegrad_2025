@@ -1,32 +1,81 @@
-(See the API table in the docs – `type`, `url`, `preset` are mutually exclusive) :contentReference[oaicite:0]{index=0} |
-| 2 | **File can’t be fetched (404 or CORS).** If the browser cannot load the `.patt` file the engine fails silently and the scene stays blank. | *Quick check:* open the link to the pattern in a new tab. You should see the ASCII matrix. If you get a 404 or a CORS error, copy the file next to your HTML or serve it from the **same origin** (same protocol + host + port) so no special headers are needed :contentReference[oaicite:1]{index=1}. |
-| 3 | **The pattern itself is hard to detect.** Low contrast, transparency, very busy graphics or too much symmetry will prevent ARToolKit from finding enough feature points. | Generate the pattern with the official marker‑trainer, keep the thick black border, use a bold high‑contrast symbol and print it at least 5 cm wide. The docs link a ready‑made trainer tool for this :contentReference[oaicite:2]{index=2}. |
-
----
-
-### Minimal working example with a custom pattern
-
-```html
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>Custom Hiro Marker Demo</title>
+  <meta charset="utf-8" />
+  <title>AR Network Propagation Demo</title>
 
-  <!-- Library versions that match -->
+  <!-- versions that are guaranteed to work together -->
   <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/[email protected]/aframe/build/aframe-ar.js"></script>
 
-  <style>html,body{margin:0;height:100%;overflow:hidden}</style>
+  <style>
+    html,body {margin:0;height:100%;overflow:hidden}
+    #info {
+      position:fixed;top:10px;left:10px;z-index:1;
+      background:rgba(255,255,255,.9);padding:6px 12px;
+      font:14px/1.2 sans-serif;border-radius:4px;
+    }
+  </style>
 </head>
-<body>
 
-<a-scene embedded arjs="sourceType:webcam;debugUIEnabled:false">
-  <!-- replace with the _relative_ path to your own .patt file -->
-  <a-marker type="pattern" url="assets/hiro_marker.patt">
-    <a-sphere color="#f00" radius="0.04"></a-sphere>
+<body>
+<div id="info">Point the camera at the marker to watch the signal spread.</div>
+
+<a-scene embedded
+         vr-mode-ui="enabled:false"
+         arjs="sourceType:webcam;debugUIEnabled:false">
+
+  <!-- Ambient & directional light so the spheres are visible -->
+  <a-entity light="type:ambient;intensity:1"></a-entity>
+  <a-entity light="type:directional;intensity:0.8" position="1 1 0"></a-entity>
+
+  <!-- Swap preset='hiro' for type='pattern' url='my_marker.patt' if you use a custom marker -->
+  <a-marker type='pattern' url='https://github.com/lejlagul/Visegrad_2025/blob/main/hiro_marker.patt'>
+
+    <!-- 10 little spheres that ‘light up’ one after another -->
+    <a-sphere position="0.25 0   0.00" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="0"    dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="0.20 0   0.15" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="600"  dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="0.08 0   0.24" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="1200" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="-0.08 0  0.24" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="1800" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="-0.20 0  0.15" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="2400" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="-0.25 0  0.00" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="3000" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="-0.20 0 -0.15" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="3600" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="-0.08 0 -0.24" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="4200" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="0.08 0  -0.24" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="4800" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
+    <a-sphere position="0.20 0  -0.15" radius="0.03" color="#777">
+      <a-animation attribute="color" begin="5400" dur="400" to="#ff3333" fill="forwards"></a-animation>
+    </a-sphere>
+
   </a-marker>
 
+  <!-- Camera that AR.js will move for you -->
   <a-entity camera></a-entity>
 </a-scene>
 </body>
