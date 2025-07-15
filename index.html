@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Hiro marker – 3‑D network demo</title>
+  <title>Hiro marker – larger 3‑D network</title>
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
@@ -23,34 +23,33 @@
 
 <body>
   <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
-  <div id="status">Searching…2025</div>
+  <div id="status">Searching…</div>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <!-- 3‑D network group -->
-      <a-entity id="network" visible="false" scale="0.5 0.5 0.5"
+      <!-- larger, more spread‑out network -->
+      <a-entity id="network" visible="false"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
 
-        <!-- nodes -->
-        <a-sphere radius="0.06" position="0 0 0"   color="#1e90ff"></a-sphere>
-        <a-sphere radius="0.06" position="0.2 0.1 0.1"   color="#ff6347"></a-sphere>
-        <a-sphere radius="0.06" position="-0.2 0.1 0.15" color="#ff6347"></a-sphere>
-        <a-sphere radius="0.06" position="0.15 -0.15 0"  color="#ff6347"></a-sphere>
-        <a-sphere radius="0.06" position="-0.15 -0.1 -0.1" color="#ff6347"></a-sphere>
-        <a-sphere radius="0.06" position="0.1 0.25 -0.1" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.06" position="-0.1 0.25 -0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.06" position="0.25 0 -0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.06" position="-0.25 0 0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.06" position="0 0.2 0.25" color="#32cd32"></a-sphere>
-        <a-sphere radius="0.06" position="0 -0.2 0.25" color="#32cd32"></a-sphere>
+        <!-- nodes (radius doubled) -->
+        <a-sphere radius="0.12" position="0 0 0"   color="#1e90ff"></a-sphere>
+        <a-sphere radius="0.12" position="0.2 0.1 0.1"   color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="-0.2 0.1 0.15" color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="0.15 -0.15 0"  color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="-0.15 -0.1 -0.1" color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="0.1 0.25 -0.1" color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="-0.1 0.25 -0.15" color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="0.25 0 -0.15" color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="-0.25 0 0.15" color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="0 0.2 0.25" color="#32cd32"></a-sphere>
+        <a-sphere radius="0.12" position="0 -0.2 0.25" color="#32cd32"></a-sphere>
 
-        <!-- links -->
-        <!-- centre star -->
+        <!-- links (unchanged; group scale is now 1, so lines are automatically “further out”) -->
         <a-entity line="start: 0 0 0; end: 0.2 0.1 0.1; color: #999"></a-entity>
         <a-entity line="start: 0 0 0; end: -0.2 0.1 0.15; color: #999"></a-entity>
         <a-entity line="start: 0 0 0; end: 0.15 -0.15 0; color: #999"></a-entity>
         <a-entity line="start: 0 0 0; end: -0.15 -0.1 -0.1; color: #999"></a-entity>
-        <!-- outer links -->
+
         <a-entity line="start: 0.2 0.1 0.1; end: 0.1 0.25 -0.1; color: #999"></a-entity>
         <a-entity line="start: -0.2 0.1 0.15; end: -0.1 0.25 -0.15; color: #999"></a-entity>
         <a-entity line="start: 0.15 -0.15 0; end: 0.25 0 -0.15; color: #999"></a-entity>
@@ -81,7 +80,7 @@
 
     marker.addEventListener('markerLost', () => {
       net.setAttribute('visible', false);
-      status.textContent = 'Searching…2025';
+      status.textContent = 'Searching…';
     });
   </script>
 </body>
