@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Custom AR.js pattern demo</title>
+  <title>Hiro‑poster demo</title>
 
   <!-- modern, matching libraries -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
-  <!-- GA4 (optional) -->
-  <!-- <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+  <!-- Google Analytics 4 – delete if you don’t need it -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
   <script>
     window.dataLayer = window.dataLayer || [];
     function gtag(){dataLayer.push(arguments);}
     gtag('js', new Date());
     gtag('config', 'G-XXXXXXXXXX');
-  </script> -->
+  </script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
@@ -39,14 +39,14 @@
   </div>
 
   <!-- status label -->
-  <div id="status">Searching…2022</div>
+  <div id="status">Searching…</div>
 
   <!-- AR scene -->
   <a-scene
     embedded
     arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled:false;"
   >
-    <!-- custom pattern, id so JS can listen -->
+    <!-- give the marker an id so the JS can find it -->
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-box id="cube"
              position="0 0.15 0"
@@ -61,7 +61,7 @@
 
   <script>
     const scene   = document.querySelector('a-scene');
-    const marker  = document.getElementById('customMarker');   // matches id above
+    const marker  = document.getElementById('hiroMarker');  // << matches id above
     const cube    = document.getElementById('cube');
     const status  = document.getElementById('status');
     const loader  = document.getElementById('loader');
@@ -73,12 +73,12 @@
     marker.addEventListener('markerFound', () => {
       cube.setAttribute('visible', true);
       status.textContent = 'Success';
-      // gtag('event', 'marker_detected', {event_category:'AR', event_label:'custom_pattern'});
+      gtag('event', 'marker_detected', {event_category:'AR', event_label:'hiro_marker'});
     });
 
     marker.addEventListener('markerLost', () => {
       cube.setAttribute('visible', false);
-      status.textContent = 'Searching…2022';
+      status.textContent = 'Searching…';
     });
   </script>
 </body>
