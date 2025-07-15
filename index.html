@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Hiro marker – larger 3‑D network</title>
+  <title>Hiro marker – wide 3‑D network</title>
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
@@ -27,37 +27,36 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <!-- larger, more spread‑out network -->
       <a-entity id="network" visible="false"
                 animation="property: rotation; to: 0 360 0; loop: true; dur: 12000; easing: linear">
 
-        <!-- nodes (radius doubled) -->
-        <a-sphere radius="0.12" position="0 0 0"   color="#1e90ff"></a-sphere>
-        <a-sphere radius="0.12" position="0.2 0.1 0.1"   color="#ff6347"></a-sphere>
-        <a-sphere radius="0.12" position="-0.2 0.1 0.15" color="#ff6347"></a-sphere>
-        <a-sphere radius="0.12" position="0.15 -0.15 0"  color="#ff6347"></a-sphere>
-        <a-sphere radius="0.12" position="-0.15 -0.1 -0.1" color="#ff6347"></a-sphere>
-        <a-sphere radius="0.12" position="0.1 0.25 -0.1" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.12" position="-0.1 0.25 -0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.12" position="0.25 0 -0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.12" position="-0.25 0 0.15" color="#ffd700"></a-sphere>
-        <a-sphere radius="0.12" position="0 0.2 0.25" color="#32cd32"></a-sphere>
-        <a-sphere radius="0.12" position="0 -0.2 0.25" color="#32cd32"></a-sphere>
+        <!-- nodes (radius 0.12, spread wider) -->
+        <a-sphere radius="0.12" position="0 0 0"               color="#1e90ff"></a-sphere>
+        <a-sphere radius="0.12" position="0.40 0.20 0.20"      color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="-0.40 0.20 0.30"     color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="0.30 -0.30 0"        color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="-0.30 -0.20 -0.20"   color="#ff6347"></a-sphere>
+        <a-sphere radius="0.12" position="0.25 0.50 -0.20"     color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="-0.25 0.50 -0.30"    color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="0.50 0 -0.30"        color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="-0.50 0 0.30"        color="#ffd700"></a-sphere>
+        <a-sphere radius="0.12" position="0 0.40 0.50"         color="#32cd32"></a-sphere>
+        <a-sphere radius="0.12" position="0 -0.40 0.50"        color="#32cd32"></a-sphere>
 
-        <!-- links (unchanged; group scale is now 1, so lines are automatically “further out”) -->
-        <a-entity line="start: 0 0 0; end: 0.2 0.1 0.1; color: #999"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.2 0.1 0.15; color: #999"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.15 -0.15 0; color: #999"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.15 -0.1 -0.1; color: #999"></a-entity>
+        <!-- links (updated coordinates) -->
+        <a-entity line="start: 0 0 0; end: 0.40 0.20 0.20; color: #999"></a-entity>
+        <a-entity line="start: 0 0 0; end: -0.40 0.20 0.30; color: #999"></a-entity>
+        <a-entity line="start: 0 0 0; end: 0.30 -0.30 0; color: #999"></a-entity>
+        <a-entity line="start: 0 0 0; end: -0.30 -0.20 -0.20; color: #999"></a-entity>
 
-        <a-entity line="start: 0.2 0.1 0.1; end: 0.1 0.25 -0.1; color: #999"></a-entity>
-        <a-entity line="start: -0.2 0.1 0.15; end: -0.1 0.25 -0.15; color: #999"></a-entity>
-        <a-entity line="start: 0.15 -0.15 0; end: 0.25 0 -0.15; color: #999"></a-entity>
-        <a-entity line="start: -0.15 -0.1 -0.1; end: -0.25 0 0.15; color: #999"></a-entity>
-        <a-entity line="start: 0.1 0.25 -0.1; end: 0 0.2 0.25; color: #999"></a-entity>
-        <a-entity line="start: -0.1 0.25 -0.15; end: 0 0.2 0.25; color: #999"></a-entity>
-        <a-entity line="start: 0.25 0 -0.15; end: 0 -0.2 0.25; color: #999"></a-entity>
-        <a-entity line="start: -0.25 0 0.15; end: 0 -0.2 0.25; color: #999"></a-entity>
+        <a-entity line="start: 0.40 0.20 0.20; end: 0.25 0.50 -0.20; color: #999"></a-entity>
+        <a-entity line="start: -0.40 0.20 0.30; end: -0.25 0.50 -0.30; color: #999"></a-entity>
+        <a-entity line="start: 0.30 -0.30 0; end: 0.50 0 -0.30; color: #999"></a-entity>
+        <a-entity line="start: -0.30 -0.20 -0.20; end: -0.50 0 0.30; color: #999"></a-entity>
+        <a-entity line="start: 0.25 0.50 -0.20; end: 0 0.40 0.50; color: #999"></a-entity>
+        <a-entity line="start: -0.25 0.50 -0.30; end: 0 0.40 0.50; color: #999"></a-entity>
+        <a-entity line="start: 0.50 0 -0.30; end: 0 -0.40 0.50; color: #999"></a-entity>
+        <a-entity line="start: -0.50 0 0.30; end: 0 -0.40 0.50; color: #999"></a-entity>
       </a-entity>
     </a-marker>
 
