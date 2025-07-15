@@ -2,130 +2,82 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Hiro marker – 3‑D signalling network in a cell</title>
+  <title>Hiro marker – signalling network in a cubic “cell”</title>
 
+  <!-- A‑Frame + AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body{margin:0;overflow:hidden;font-family:monospace}
-    #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;
-            z-index:1000;pointer-events:none}
+    #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
     #loader{position:fixed;inset:0;display:flex;flex-direction:column;
             align-items:center;justify-content:center;background:#000}
-    .spinner{width:48px;height:48px;border:6px solid #fff;
-             border-top-color:transparent;border-radius:50%;
-             animation:spin 1s linear infinite}
+    .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
+             border-radius:50%;animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
 </head>
 
 <body>
   <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
-  <div id="status">Searching…2025</div>
+  <div id="status">Searching…</div>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <a-entity id="network" visible="false" drag-rotate>
+      <a-entity id="cell" visible="false" drag-rotate>
 
-        <!-- translucent “cell” wrapper -->
-        <a-sphere radius="0.8"
-                  color="#00ffff"
-                  material="opacity:0.12; transparent:true; side:double"></a-sphere>
+        <!-- ­­­‑‑‑   cell membrane – transparent cube   ‑‑‑‑‑ -->
+        <a-box depth="1.6" height="1.6" width="1.6"
+               material="color:#00ffff; opacity:0.12; transparent:true; side:double"></a-box>
 
-        <!-- 19 nodes (grey → red) -->
-        <a-sphere id="sphere0" radius="0.12" position="0 0 0" color="#888"></a-sphere>
+        <!-- nucleus – translucent purple sphere -->
+        <a-sphere radius="0.30" position="0 0 0"
+                  material="color:#800080; opacity:0.30; transparent:true"></a-sphere>
 
-        <!-- inner hexagon (r ≈ 0.3 m) -->
-        <a-sphere id="sphere1"  radius="0.12" position="0.30 0.00 0"  color="#888"></a-sphere>
-        <a-sphere id="sphere2"  radius="0.12" position="0.15 0.26 0"  color="#888"></a-sphere>
-        <a-sphere id="sphere3"  radius="0.12" position="-0.15 0.26 0" color="#888"></a-sphere>
-        <a-sphere id="sphere4"  radius="0.12" position="-0.30 0.00 0" color="#888"></a-sphere>
-        <a-sphere id="sphere5"  radius="0.12" position="-0.15 -0.26 0" color="#888"></a-sphere>
-        <a-sphere id="sphere6"  radius="0.12" position="0.15 -0.26 0" color="#888"></a-sphere>
+        <!-- Golgi complex – stacked “pancakes” -->
+        <a-box width="0.45" height="0.04" depth="0.30" position="-0.45 0.25 0.15"
+               material="color:#cd853f; opacity:0.60"></a-box>
+        <a-box width="0.35" height="0.04" depth="0.25" position="-0.45 0.20 0.05"
+               material="color:#d2b48c; opacity:0.60"></a-box>
+        <a-box width="0.30" height="0.04" depth="0.20" position="-0.45 0.15 -0.05"
+               material="color:#deb887; opacity:0.60"></a-box>
 
-        <!-- top hexagon (r ≈ 0.5 m, z = 0.3 m) -->
-        <a-sphere id="sphere7"  radius="0.12" position="0.50 0.00 0.30"  color="#888"></a-sphere>
-        <a-sphere id="sphere8"  radius="0.12" position="0.25 0.43 0.30"  color="#888"></a-sphere>
-        <a-sphere id="sphere9"  radius="0.12" position="-0.25 0.43 0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere10" radius="0.12" position="-0.50 0.00 0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere11" radius="0.12" position="-0.25 -0.43 0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere12" radius="0.12" position="0.25 -0.43 0.30"  color="#888"></a-sphere>
+        <!-- two mitochondria -->
+        <a-cylinder radius="0.10" height="0.40" position="0.55 -0.25 0.15"
+                    rotation="0 0 90" material="color:#ff8c00; opacity:0.80"></a-cylinder>
+        <a-cylinder radius="0.10" height="0.35" position="0.40 0.35 -0.25"
+                    rotation="60 30 20" material="color:#ff8c00; opacity:0.80"></a-cylinder>
 
-        <!-- bottom hexagon (r ≈ 0.5 m, z = ‑0.3 m) -->
-        <a-sphere id="sphere13" radius="0.12" position="0.50 0.00 -0.30"  color="#888"></a-sphere>
-        <a-sphere id="sphere14" radius="0.12" position="0.25 0.43 -0.30"  color="#888"></a-sphere>
-        <a-sphere id="sphere15" radius="0.12" position="-0.25 0.43 -0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere16" radius="0.12" position="-0.50 0.00 -0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere17" radius="0.12" position="-0.25 -0.43 -0.30" color="#888"></a-sphere>
-        <a-sphere id="sphere18" radius="0.12" position="0.25 -0.43 -0.30"  color="#888"></a-sphere>
+        <!-- ­­­‑‑‑‑‑ signalling nodes  ‑‑‑‑‑ -->
+        <!-- membrane receptor (first to turn red) -->
+        <a-sphere id="s0" radius="0.07" position="0.80 0 0" color="#888"></a-sphere>
 
-        <!-- links: centre → every node -->
-        <!-- (plus hexagon rims & radial struts for visual density) -->
-        <!-- central spokes -->
-        <a-entity line="start: 0 0 0; end: 0.30 0.00 0;    color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.15 0.26 0;    color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.15 0.26 0;   color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.30 0.00 0;   color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.15 -0.26 0;  color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.15 -0.26 0;   color:#666"></a-entity>
+        <!-- first inner layer (≈ 0.55 m from centre) -->
+        <a-sphere id="s1" radius="0.07" position="0.55 0.20 0.20"  color="#888"></a-sphere>
+        <a-sphere id="s2" radius="0.07" position="-0.55 0.20 0.20" color="#888"></a-sphere>
+        <a-sphere id="s3" radius="0.07" position="0.55 -0.20 0.20" color="#888"></a-sphere>
+        <a-sphere id="s4" radius="0.07" position="-0.55 -0.20 0.20"color="#888"></a-sphere>
+        <a-sphere id="s5" radius="0.07" position="0.55 0.20 -0.20" color="#888"></a-sphere>
+        <a-sphere id="s6" radius="0.07" position="-0.55 0.20 -0.20"color="#888"></a-sphere>
+        <a-sphere id="s7" radius="0.07" position="0.55 -0.20 -0.20"color="#888"></a-sphere>
+        <a-sphere id="s8" radius="0.07" position="-0.55 -0.20 -0.20"color="#888"></a-sphere>
 
-        <!-- spokes to top ring -->
-        <a-entity line="start: 0 0 0; end: 0.50 0.00 0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.25 0.43 0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.25 0.43 0.30; color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.50 0.00 0.30; color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.25 -0.43 0.30;color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.25 -0.43 0.30; color:#666"></a-entity>
+        <!-- second layer (≈ 0.35 m) -->
+        <a-sphere id="s9"  radius="0.07" position="0.35 0 0.35"  color="#888"></a-sphere>
+        <a-sphere id="s10" radius="0.07" position="-0.35 0 0.35" color="#888"></a-sphere>
+        <a-sphere id="s11" radius="0.07" position="0.35 0 -0.35" color="#888"></a-sphere>
+        <a-sphere id="s12" radius="0.07" position="-0.35 0 -0.35"color="#888"></a-sphere>
+        <a-sphere id="s13" radius="0.07" position="0 0.35 0"     color="#888"></a-sphere>
+        <a-sphere id="s14" radius="0.07" position="0 -0.35 0"    color="#888"></a-sphere>
 
-        <!-- spokes to bottom ring -->
-        <a-entity line="start: 0 0 0; end: 0.50 0.00 -0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.25 0.43 -0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.25 0.43 -0.30; color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.50 0.00 -0.30; color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: -0.25 -0.43 -0.30;color:#666"></a-entity>
-        <a-entity line="start: 0 0 0; end: 0.25 -0.43 -0.30; color:#666"></a-entity>
+        <!-- inner layer near nucleus (≈ 0.20 m) -->
+        <a-sphere id="s15" radius="0.07" position="0 0 0.50"     color="#888"></a-sphere>
+        <a-sphere id="s16" radius="0.07" position="0 0 -0.50"    color="#888"></a-sphere>
 
-        <!-- hexagon rims (inner, top, bottom) -->
-        <!-- inner rim -->
-        <a-entity line="start: 0.30 0.00 0; end: 0.15 0.26 0;    color:#666"></a-entity>
-        <a-entity line="start: 0.15 0.26 0; end: -0.15 0.26 0;   color:#666"></a-entity>
-        <a-entity line="start: -0.15 0.26 0; end: -0.30 0.00 0;  color:#666"></a-entity>
-        <a-entity line="start: -0.30 0.00 0; end: -0.15 -0.26 0; color:#666"></a-entity>
-        <a-entity line="start: -0.15 -0.26 0; end: 0.15 -0.26 0; color:#666"></a-entity>
-        <a-entity line="start: 0.15 -0.26 0; end: 0.30 0.00 0;   color:#666"></a-entity>
-
-        <!-- top rim -->
-        <a-entity line="start: 0.50 0.00 0.30; end: 0.25 0.43 0.30;    color:#666"></a-entity>
-        <a-entity line="start: 0.25 0.43 0.30; end: -0.25 0.43 0.30;   color:#666"></a-entity>
-        <a-entity line="start: -0.25 0.43 0.30; end: -0.50 0.00 0.30;  color:#666"></a-entity>
-        <a-entity line="start: -0.50 0.00 0.30; end: -0.25 -0.43 0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.25 -0.43 0.30; end: 0.25 -0.43 0.30; color:#666"></a-entity>
-        <a-entity line="start: 0.25 -0.43 0.30; end: 0.50 0.00 0.30;   color:#666"></a-entity>
-
-        <!-- bottom rim -->
-        <a-entity line="start: 0.50 0.00 -0.30; end: 0.25 0.43 -0.30;    color:#666"></a-entity>
-        <a-entity line="start: 0.25 0.43 -0.30; end: -0.25 0.43 -0.30;   color:#666"></a-entity>
-        <a-entity line="start: -0.25 0.43 -0.30; end: -0.50 0.00 -0.30;  color:#666"></a-entity>
-        <a-entity line="start: -0.50 0.00 -0.30; end: -0.25 -0.43 -0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.25 -0.43 -0.30; end: 0.25 -0.43 -0.30; color:#666"></a-entity>
-        <a-entity line="start: 0.25 -0.43 -0.30; end: 0.50 0.00 -0.30;   color:#666"></a-entity>
-
-        <!-- radial struts (inner → top & bottom rings) -->
-        <a-entity line="start: 0.30 0.00 0;   end: 0.50 0.00 0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0.15 0.26 0;   end: 0.25 0.43 0.30;  color:#666"></a-entity>
-        <a-entity line="start: -0.15 0.26 0;  end: -0.25 0.43 0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.30 0.00 0;  end: -0.50 0.00 0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.15 -0.26 0; end: -0.25 -0.43 0.30;color:#666"></a-entity>
-        <a-entity line="start: 0.15 -0.26 0;  end: 0.25 -0.43 0.30; color:#666"></a-entity>
-
-        <a-entity line="start: 0.30 0.00 0;   end: 0.50 0.00 -0.30;  color:#666"></a-entity>
-        <a-entity line="start: 0.15 0.26 0;   end: 0.25 0.43 -0.30;  color:#666"></a-entity>
-        <a-entity line="start: -0.15 0.26 0;  end: -0.25 0.43 -0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.30 0.00 0;  end: -0.50 0.00 -0.30; color:#666"></a-entity>
-        <a-entity line="start: -0.15 -0.26 0; end: -0.25 -0.43 -0.30;color:#666"></a-entity>
-        <a-entity line="start: 0.15 -0.26 0;  end: 0.25 -0.43 -0.30; color:#666"></a-entity>
+        <!-- optional connecting lines: membrane receptor → nucleus -->
+        <a-entity line="start: 0.80 0 0; end: 0 0 0; color:#666"></a-entity>
       </a-entity>
     </a-marker>
 
@@ -142,56 +94,57 @@
         const start=e=>{this.dragging=true;this.prevX=e.clientX;this.prevY=e.clientY};
         const move=(x,y,f=1)=>{if(!this.dragging)return;
           const r=this.el.getAttribute('rotation');
-          this.el.setAttribute('rotation',{x:r.x+(y-this.prevY)*f*this.data.speed,
-                                           y:r.y+(x-this.prevX)*f*this.data.speed,z:r.z});
+          this.el.setAttribute('rotation',{
+              x:r.x+(y-this.prevY)*f*this.data.speed,
+              y:r.y+(x-this.prevX)*f*this.data.speed,z:r.z});
           this.prevX=x;this.prevY=y;};
         cvs.addEventListener('mousedown',e=>start(e));
         window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
         window.addEventListener('mouseup',()=>this.dragging=false);
         cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
-        window.addEventListener('touchmove',e=>{if(this.dragging){e.preventDefault();
-          move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},{passive:false});
+        window.addEventListener('touchmove',e=>{
+          if(this.dragging){e.preventDefault();
+            move(e.touches[0].clientX,e.touches[0].clientY,0.5);}}, {passive:false});
         window.addEventListener('touchend',()=>this.dragging=false);
       }
     });
 
-    /* signal‑propagation groups */
+    /* propagation groups: membrane → layers → near nucleus */
     const groups=[
-      ["sphere0"],
-      ["sphere1","sphere2","sphere3","sphere4","sphere5","sphere6"],
-      ["sphere7","sphere8","sphere9","sphere10","sphere11","sphere12"],
-      ["sphere13","sphere14","sphere15","sphere16","sphere17","sphere18"]
+      ['s0'],
+      ['s1','s2','s3','s4','s5','s6','s7','s8'],
+      ['s9','s10','s11','s12','s13','s14'],
+      ['s15','s16']
     ];
     let timers=[];
     function startPropagation(){
       groups.forEach((ids,i)=>{
         timers.push(setTimeout(()=>{
           ids.forEach(id=>document.getElementById(id).setAttribute('color','#ff0000'));
-        },i*600));   // 600 ms between rings
+        },i*700));                       // 700 ms between waves
       });
     }
     function resetPropagation(){
       timers.forEach(clearTimeout);timers=[];
-      document.querySelectorAll('#network a-sphere')
-        .forEach(s=>s.setAttribute('color','#888'));
+      document.querySelectorAll('#cell a-sphere[id^="s"]').forEach(s=>s.setAttribute('color','#888'));
     }
 
-    /* marker logic */
+    /* marker / UI logic */
     const scene=document.querySelector('a-scene');
     const marker=document.getElementById('hiroMarker');
-    const net=document.getElementById('network');
+    const cell=document.getElementById('cell');
     const status=document.getElementById('status');
     const loader=document.getElementById('loader');
 
     scene.addEventListener('loaded',()=>loader.style.display='none');
     marker.addEventListener('markerFound',()=>{
-      net.setAttribute('visible',true);
+      cell.setAttribute('visible',true);
       status.textContent='Success';
       startPropagation();
     });
     marker.addEventListener('markerLost',()=>{
-      net.setAttribute('visible',false);
-      status.textContent='Searching…2025';
+      cell.setAttribute('visible',false);
+      status.textContent='Searching…';
       resetPropagation();
     });
   </script>
