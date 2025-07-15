@@ -2,9 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Hiro marker – signalling network in a cubic “cell”</title>
+  <title>Signalling network in a cubic cell</title>
 
-  <!-- A‑Frame + AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
@@ -28,56 +27,56 @@
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-entity id="cell" visible="false" drag-rotate>
 
-        <!-- ­­­‑‑‑   cell membrane – transparent cube   ‑‑‑‑‑ -->
-        <a-box depth="1.6" height="1.6" width="1.6"
-               material="color:#00ffff; opacity:0.12; transparent:true; side:double"></a-box>
+        <!-- transparent CUBE membrane -->
+        <a-box width="1.6" height="1.6" depth="1.6"
+               material="color:#00ffff; opacity:0.10; transparent:true; side:double"></a-box>
 
-        <!-- nucleus – translucent purple sphere -->
-        <a-sphere radius="0.30" position="0 0 0"
-                  material="color:#800080; opacity:0.30; transparent:true"></a-sphere>
+        <!-- nucleus (larger, more opaque for visibility) -->
+        <a-sphere radius="0.40" position="0 0 0"
+                  material="color:#800080; opacity:0.45; transparent:true"></a-sphere>
 
-        <!-- Golgi complex – stacked “pancakes” -->
-        <a-box width="0.45" height="0.04" depth="0.30" position="-0.45 0.25 0.15"
-               material="color:#cd853f; opacity:0.60"></a-box>
-        <a-box width="0.35" height="0.04" depth="0.25" position="-0.45 0.20 0.05"
-               material="color:#d2b48c; opacity:0.60"></a-box>
-        <a-box width="0.30" height="0.04" depth="0.20" position="-0.45 0.15 -0.05"
-               material="color:#deb887; opacity:0.60"></a-box>
+        <!-- Golgi stack (layered “pancakes”) -->
+        <a-box width="0.50" height="0.05" depth="0.32" position="-0.55 0.22 0.15"
+               material="color:#cd853f; opacity:0.75"></a-box>
+        <a-box width="0.38" height="0.05" depth="0.26" position="-0.55 0.14 0.05"
+               material="color:#d2b48c; opacity:0.75"></a-box>
+        <a-box width="0.30" height="0.05" depth="0.22" position="-0.55 0.06 -0.05"
+               material="color:#deb887; opacity:0.75"></a-box>
 
-        <!-- two mitochondria -->
-        <a-cylinder radius="0.10" height="0.40" position="0.55 -0.25 0.15"
-                    rotation="0 0 90" material="color:#ff8c00; opacity:0.80"></a-cylinder>
-        <a-cylinder radius="0.10" height="0.35" position="0.40 0.35 -0.25"
-                    rotation="60 30 20" material="color:#ff8c00; opacity:0.80"></a-cylinder>
+        <!-- mitochondria (orange capsules) -->
+        <a-cylinder radius="0.12" height="0.45" position="0.55 -0.30 0.20"
+                    rotation="0 0 90" material="color:#ff8c00; opacity:0.85"></a-cylinder>
+        <a-cylinder radius="0.12" height="0.38" position="0.45 0.38 -0.28"
+                    rotation="60 30 20" material="color:#ff8c00; opacity:0.85"></a-cylinder>
 
-        <!-- ­­­‑‑‑‑‑ signalling nodes  ‑‑‑‑‑ -->
-        <!-- membrane receptor (first to turn red) -->
-        <a-sphere id="s0" radius="0.07" position="0.80 0 0" color="#888"></a-sphere>
+        <!-- signalling nodes -->
+        <!-- membrane receptor – now on TOP face ( y = +0.8 ) -->
+        <a-sphere id="s0" radius="0.08" position="0 0.80 0" color="#888"></a-sphere>
 
-        <!-- first inner layer (≈ 0.55 m from centre) -->
-        <a-sphere id="s1" radius="0.07" position="0.55 0.20 0.20"  color="#888"></a-sphere>
-        <a-sphere id="s2" radius="0.07" position="-0.55 0.20 0.20" color="#888"></a-sphere>
-        <a-sphere id="s3" radius="0.07" position="0.55 -0.20 0.20" color="#888"></a-sphere>
-        <a-sphere id="s4" radius="0.07" position="-0.55 -0.20 0.20"color="#888"></a-sphere>
-        <a-sphere id="s5" radius="0.07" position="0.55 0.20 -0.20" color="#888"></a-sphere>
-        <a-sphere id="s6" radius="0.07" position="-0.55 0.20 -0.20"color="#888"></a-sphere>
-        <a-sphere id="s7" radius="0.07" position="0.55 -0.20 -0.20"color="#888"></a-sphere>
-        <a-sphere id="s8" radius="0.07" position="-0.55 -0.20 -0.20"color="#888"></a-sphere>
+        <!-- first inner layer (near membrane, eight nodes) -->
+        <a-sphere id="s1"  radius="0.08" position="0.55 0.20 0.20"  color="#888"></a-sphere>
+        <a-sphere id="s2"  radius="0.08" position="-0.55 0.20 0.20" color="#888"></a-sphere>
+        <a-sphere id="s3"  radius="0.08" position="0.55 -0.20 0.20" color="#888"></a-sphere>
+        <a-sphere id="s4"  radius="0.08" position="-0.55 -0.20 0.20"color="#888"></a-sphere>
+        <a-sphere id="s5"  radius="0.08" position="0.55 0.20 -0.20" color="#888"></a-sphere>
+        <a-sphere id="s6"  radius="0.08" position="-0.55 0.20 -0.20"color="#888"></a-sphere>
+        <a-sphere id="s7"  radius="0.08" position="0.55 -0.20 -0.20"color="#888"></a-sphere>
+        <a-sphere id="s8"  radius="0.08" position="-0.55 -0.20 -0.20"color="#888"></a-sphere>
 
-        <!-- second layer (≈ 0.35 m) -->
-        <a-sphere id="s9"  radius="0.07" position="0.35 0 0.35"  color="#888"></a-sphere>
-        <a-sphere id="s10" radius="0.07" position="-0.35 0 0.35" color="#888"></a-sphere>
-        <a-sphere id="s11" radius="0.07" position="0.35 0 -0.35" color="#888"></a-sphere>
-        <a-sphere id="s12" radius="0.07" position="-0.35 0 -0.35"color="#888"></a-sphere>
-        <a-sphere id="s13" radius="0.07" position="0 0.35 0"     color="#888"></a-sphere>
-        <a-sphere id="s14" radius="0.07" position="0 -0.35 0"    color="#888"></a-sphere>
+        <!-- second layer (mid‑cell, six nodes) -->
+        <a-sphere id="s9"  radius="0.08" position="0.35 0 0.35"   color="#888"></a-sphere>
+        <a-sphere id="s10" radius="0.08" position="-0.35 0 0.35"  color="#888"></a-sphere>
+        <a-sphere id="s11" radius="0.08" position="0.35 0 -0.35"  color="#888"></a-sphere>
+        <a-sphere id="s12" radius="0.08" position="-0.35 0 -0.35" color="#888"></a-sphere>
+        <a-sphere id="s13" radius="0.08" position="0 0.35 0"      color="#888"></a-sphere>
+        <a-sphere id="s14" radius="0.08" position="0 -0.35 0"     color="#888"></a-sphere>
 
-        <!-- inner layer near nucleus (≈ 0.20 m) -->
-        <a-sphere id="s15" radius="0.07" position="0 0 0.50"     color="#888"></a-sphere>
-        <a-sphere id="s16" radius="0.07" position="0 0 -0.50"    color="#888"></a-sphere>
+        <!-- inner‑most pair near nucleus -->
+        <a-sphere id="s15" radius="0.08" position="0 0 0.50"  color="#888"></a-sphere>
+        <a-sphere id="s16" radius="0.08" position="0 0 -0.50" color="#888"></a-sphere>
 
-        <!-- optional connecting lines: membrane receptor → nucleus -->
-        <a-entity line="start: 0.80 0 0; end: 0 0 0; color:#666"></a-entity>
+        <!-- guiding line: receptor → nucleus -->
+        <a-entity line="start: 0 0.80 0; end: 0 0 0; color:#666"></a-entity>
       </a-entity>
     </a-marker>
 
@@ -89,14 +88,15 @@
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
       init(){
-        this.dragging=false;this.prevX=0;this.prevY=0;
         const cvs=this.el.sceneEl.canvas;
+        this.dragging=false;this.prevX=0;this.prevY=0;
         const start=e=>{this.dragging=true;this.prevX=e.clientX;this.prevY=e.clientY};
         const move=(x,y,f=1)=>{if(!this.dragging)return;
           const r=this.el.getAttribute('rotation');
           this.el.setAttribute('rotation',{
-              x:r.x+(y-this.prevY)*f*this.data.speed,
-              y:r.y+(x-this.prevX)*f*this.data.speed,z:r.z});
+            x:r.x+(y-this.prevY)*f*this.data.speed,
+            y:r.y+(x-this.prevX)*f*this.data.speed,
+            z:r.z});
           this.prevX=x;this.prevY=y;};
         cvs.addEventListener('mousedown',e=>start(e));
         window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
@@ -109,7 +109,7 @@
       }
     });
 
-    /* propagation groups: membrane → layers → near nucleus */
+    /* signal propagation: membrane → inner layer → mid‑cell → near nucleus */
     const groups=[
       ['s0'],
       ['s1','s2','s3','s4','s5','s6','s7','s8'],
@@ -117,19 +117,20 @@
       ['s15','s16']
     ];
     let timers=[];
-    function startPropagation(){
+    function propagate(){
       groups.forEach((ids,i)=>{
         timers.push(setTimeout(()=>{
           ids.forEach(id=>document.getElementById(id).setAttribute('color','#ff0000'));
-        },i*700));                       // 700 ms between waves
+        },i*700));
       });
     }
-    function resetPropagation(){
+    function reset(){
       timers.forEach(clearTimeout);timers=[];
-      document.querySelectorAll('#cell a-sphere[id^="s"]').forEach(s=>s.setAttribute('color','#888'));
+      document.querySelectorAll('#cell a-sphere[id^="s"]')
+        .forEach(s=>s.setAttribute('color','#888'));
     }
 
-    /* marker / UI logic */
+    /* marker‑UI logic */
     const scene=document.querySelector('a-scene');
     const marker=document.getElementById('hiroMarker');
     const cell=document.getElementById('cell');
@@ -140,12 +141,12 @@
     marker.addEventListener('markerFound',()=>{
       cell.setAttribute('visible',true);
       status.textContent='Success';
-      startPropagation();
+      propagate();
     });
     marker.addEventListener('markerLost',()=>{
       cell.setAttribute('visible',false);
       status.textContent='Searching…';
-      resetPropagation();
+      reset();
     });
   </script>
 </body>
