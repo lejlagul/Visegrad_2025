@@ -1,82 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <title>AR Network Propagation Demo</title>
-
-  <!-- versions that are guaranteed to work together -->
-  <script src="https://aframe.io/releases/1.0.4/aframe.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/[email protected]/aframe/build/aframe-ar.js"></script>
-
-  <style>
-    html,body {margin:0;height:100%;overflow:hidden}
-    #info {
-      position:fixed;top:10px;left:10px;z-index:1;
-      background:rgba(255,255,255,.9);padding:6px 12px;
-      font:14px/1.2 sans-serif;border-radius:4px;
-    }
-  </style>
-</head>
-
-<body>
-<div id="info">Point the camera at the marker to watch the signal spread.</div>
-
-<a-scene embedded
-         vr-mode-ui="enabled:false"
-         arjs="sourceType:webcam;debugUIEnabled:false">
-
-  <!-- Ambient & directional light so the spheres are visible -->
-  <a-entity light="type:ambient;intensity:1"></a-entity>
-  <a-entity light="type:directional;intensity:0.8" position="1 1 0"></a-entity>
-
-  <!-- Swap preset='hiro' for type='pattern' url='my_marker.patt' if you use a custom marker -->
-  <a-marker type='pattern' url='https://github.com/lejlagul/Visegrad_2025/blob/main/hiro_marker.patt'>
-
-    <!-- 10 little spheres that ‘light up’ one after another -->
-    <a-sphere position="0.25 0   0.00" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="0"    dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="0.20 0   0.15" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="600"  dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="0.08 0   0.24" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="1200" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="-0.08 0  0.24" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="1800" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="-0.20 0  0.15" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="2400" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="-0.25 0  0.00" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="3000" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="-0.20 0 -0.15" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="3600" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="-0.08 0 -0.24" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="4200" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="0.08 0  -0.24" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="4800" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-    <a-sphere position="0.20 0  -0.15" radius="0.03" color="#777">
-      <a-animation attribute="color" begin="5400" dur="400" to="#ff3333" fill="forwards"></a-animation>
-    </a-sphere>
-
-  </a-marker>
-
-  <!-- Camera that AR.js will move for you -->
-  <a-entity camera></a-entity>
-</a-scene>
+<!-- include A-Frame obviously -->
+<script src="https://aframe.io/releases/0.6.0/aframe.min.js"></script>
+<!-- include ar.js for A-Frame -->
+<script src="https://jeromeetienne.github.io/AR.js/aframe/build/aframe-ar.js"></script>
+<body style='margin : 0px; overflow: hidden;'>
+  <a-scene embedded arjs>
+    <!-- create your content here. just a box for now -->
+    <a-box position='0 0.5 0' material='opacity: 0.5;'></a-box>
+    <!-- define a camera which will move according to the marker position -->
+    <a-marker-camera preset='hiro'></a-marker-camera>
+  </a-scene>
 </body>
-</html>
