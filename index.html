@@ -123,7 +123,7 @@
           const path=`${n.x} ${n.y} ${n.z}, ${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
           cell.insertAdjacentHTML('beforeend',
             `<a-entity id="${id}"
-                       meshline="lineWidth:${LINE_W};path:${path};color:#666"></a-entity>`);
+                       meshline="lineWidth:${LINE_W};path:${path};color:#FFF"></a-entity>`);
           edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
@@ -173,7 +173,7 @@
 
     function resetNetwork(){
       timers.forEach(clearTimeout);timers=[];
-      resetColours('#666');
+      resetColours('#FFF');
     }
 
     /* ---------------- lifecycle ---------------- */
