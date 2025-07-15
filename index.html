@@ -5,8 +5,10 @@
   <title>Cubic cell – 50‑node network (thick edges & auto‑restart)</title>
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+  <!-- load meshline component directly -->
+  <script src="https://raw.githack.com/andreasplesch/aframe-meshline-component/master/dist/aframe-meshline-component.min.js"></script>
+
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/aframe-meshline@1.2.0/dist/aframe-meshline.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
@@ -67,7 +69,7 @@
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
-    const LINE_W=160;            // thicker edges
+    const LINE_W=16;            // thicker edges
 
     /* data */
     const nodes=[];   // {id,x,y,z,el}
