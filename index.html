@@ -2,17 +2,21 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Signalling network in a cubic cell</title>
+  <title>Cubic cell – 50‑node signalling network</title>
 
+  <!-- A‑Frame + AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
+  <!-- thick 3‑D lines -->
+  <script src="https://cdn.jsdelivr.net/npm/aframe-meshline@1.2.0/dist/aframe-meshline.min.js"></script>
+
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body{margin:0;overflow:hidden;font-family:monospace}
-    #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
-    #loader{position:fixed;inset:0;display:flex;flex-direction:column;
-            align-items:center;justify-content:center;background:#000}
+    body{margin:0;overflow:hidden}
+    #status{position:fixed;top:10px;left:10px;font:24px monospace;color:#fff;z-index:1000}
+    #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
+            align-items:center;background:#000}
     .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
              border-radius:50%;animation:spin 1s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}
@@ -25,128 +29,219 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <a-entity id="cell" visible="false" drag-rotate>
-
-        <!-- transparent CUBE membrane -->
-        <a-box width="1.6" height="1.6" depth="1.6"
-               material="color:#00ffff; opacity:0.10; transparent:true; side:double"></a-box>
-
-        <!-- nucleus (larger, more opaque for visibility) -->
-        <a-sphere radius="0.40" position="0 0 0"
-                  material="color:#800080; opacity:0.45; transparent:true"></a-sphere>
-
-        <!-- Golgi stack (layered “pancakes”) -->
-        <a-box width="0.50" height="0.05" depth="0.32" position="-0.55 0.22 0.15"
-               material="color:#cd853f; opacity:0.75"></a-box>
-        <a-box width="0.38" height="0.05" depth="0.26" position="-0.55 0.14 0.05"
-               material="color:#d2b48c; opacity:0.75"></a-box>
-        <a-box width="0.30" height="0.05" depth="0.22" position="-0.55 0.06 -0.05"
-               material="color:#deb887; opacity:0.75"></a-box>
-
-        <!-- mitochondria (orange capsules) -->
-        <a-cylinder radius="0.12" height="0.45" position="0.55 -0.30 0.20"
-                    rotation="0 0 90" material="color:#ff8c00; opacity:0.85"></a-cylinder>
-        <a-cylinder radius="0.12" height="0.38" position="0.45 0.38 -0.28"
-                    rotation="60 30 20" material="color:#ff8c00; opacity:0.85"></a-cylinder>
-
-        <!-- signalling nodes -->
-        <!-- membrane receptor – now on TOP face ( y = +0.8 ) -->
-        <a-sphere id="s0" radius="0.08" position="0 0.80 0" color="#888"></a-sphere>
-
-        <!-- first inner layer (near membrane, eight nodes) -->
-        <a-sphere id="s1"  radius="0.08" position="0.55 0.20 0.20"  color="#888"></a-sphere>
-        <a-sphere id="s2"  radius="0.08" position="-0.55 0.20 0.20" color="#888"></a-sphere>
-        <a-sphere id="s3"  radius="0.08" position="0.55 -0.20 0.20" color="#888"></a-sphere>
-        <a-sphere id="s4"  radius="0.08" position="-0.55 -0.20 0.20"color="#888"></a-sphere>
-        <a-sphere id="s5"  radius="0.08" position="0.55 0.20 -0.20" color="#888"></a-sphere>
-        <a-sphere id="s6"  radius="0.08" position="-0.55 0.20 -0.20"color="#888"></a-sphere>
-        <a-sphere id="s7"  radius="0.08" position="0.55 -0.20 -0.20"color="#888"></a-sphere>
-        <a-sphere id="s8"  radius="0.08" position="-0.55 -0.20 -0.20"color="#888"></a-sphere>
-
-        <!-- second layer (mid‑cell, six nodes) -->
-        <a-sphere id="s9"  radius="0.08" position="0.35 0 0.35"   color="#888"></a-sphere>
-        <a-sphere id="s10" radius="0.08" position="-0.35 0 0.35"  color="#888"></a-sphere>
-        <a-sphere id="s11" radius="0.08" position="0.35 0 -0.35"  color="#888"></a-sphere>
-        <a-sphere id="s12" radius="0.08" position="-0.35 0 -0.35" color="#888"></a-sphere>
-        <a-sphere id="s13" radius="0.08" position="0 0.35 0"      color="#888"></a-sphere>
-        <a-sphere id="s14" radius="0.08" position="0 -0.35 0"     color="#888"></a-sphere>
-
-        <!-- inner‑most pair near nucleus -->
-        <a-sphere id="s15" radius="0.08" position="0 0 0.50"  color="#888"></a-sphere>
-        <a-sphere id="s16" radius="0.08" position="0 0 -0.50" color="#888"></a-sphere>
-
-        <!-- guiding line: receptor → nucleus -->
-        <a-entity line="start: 0 0.80 0; end: 0 0 0; color:#666"></a-entity>
-      </a-entity>
+      <a-entity id="cell" visible="false" drag-rotate></a-entity>
     </a-marker>
-
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate component -->
+  <!-- drag‑rotate (unchanged) -->
   <script>
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
       init(){
         const cvs=this.el.sceneEl.canvas;
-        this.dragging=false;this.prevX=0;this.prevY=0;
-        const start=e=>{this.dragging=true;this.prevX=e.clientX;this.prevY=e.clientY};
-        const move=(x,y,f=1)=>{if(!this.dragging)return;
+        this.drag=false;this.px=0;this.py=0;
+        const st=e=>{this.drag=true;this.px=e.clientX;this.py=e.clientY};
+        const mv=(x,y,f=1)=>{if(!this.drag)return;
           const r=this.el.getAttribute('rotation');
           this.el.setAttribute('rotation',{
-            x:r.x+(y-this.prevY)*f*this.data.speed,
-            y:r.y+(x-this.prevX)*f*this.data.speed,
-            z:r.z});
-          this.prevX=x;this.prevY=y;};
-        cvs.addEventListener('mousedown',e=>start(e));
-        window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
-        window.addEventListener('mouseup',()=>this.dragging=false);
-        cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
+             x:r.x+(y-this.py)*f*this.data.speed,
+             y:r.y+(x-this.px)*f*this.data.speed,z:r.z});
+          this.px=x;this.py=y;};
+        cvs.addEventListener('mousedown',e=>st(e));
+        window.addEventListener('mousemove',e=>mv(e.clientX,e.clientY));
+        window.addEventListener('mouseup',()=>this.drag=false);
+        cvs.addEventListener('touchstart',e=>st(e.touches[0]),{passive:false});
         window.addEventListener('touchmove',e=>{
-          if(this.dragging){e.preventDefault();
-            move(e.touches[0].clientX,e.touches[0].clientY,0.5);}}, {passive:false});
-        window.addEventListener('touchend',()=>this.dragging=false);
+          if(this.drag){e.preventDefault();mv(e.touches[0].clientX,e.touches[0].clientY,0.5);}
+        },{passive:false});
+        window.addEventListener('touchend',()=>this.drag=false);
       }
     });
+  </script>
 
-    /* signal propagation: membrane → inner layer → mid‑cell → near nucleus */
-    const groups=[
-      ['s0'],
-      ['s1','s2','s3','s4','s5','s6','s7','s8'],
-      ['s9','s10','s11','s12','s13','s14'],
-      ['s15','s16']
-    ];
-    let timers=[];
-    function propagate(){
-      groups.forEach((ids,i)=>{
-        timers.push(setTimeout(()=>{
-          ids.forEach(id=>document.getElementById(id).setAttribute('color','#ff0000'));
-        },i*700));
+  <!-- build the cell interior & network -->
+  <script>
+    const scene      = document.querySelector('a-scene');
+    const marker     = document.getElementById('hiroMarker');
+    const cellEntity = document.getElementById('cell');
+    const statusTxt  = document.getElementById('status');
+    const loader     = document.getElementById('loader');
+
+    /* --- build static organelles ---------------------------------------------------- */
+    function addStaticOrganelles() {
+      /* membrane cube */
+      const mem = document.createElement('a-box');
+      mem.setAttribute('width','1.6');
+      mem.setAttribute('height','1.6');
+      mem.setAttribute('depth','1.6');
+      mem.setAttribute('material','color:#00ffff;opacity:0.10;transparent:true;side:double');
+      cellEntity.appendChild(mem);
+
+      /* nucleus */
+      const nuc = document.createElement('a-sphere');
+      nuc.setAttribute('radius','0.45');
+      nuc.setAttribute('material','color:#800080;opacity:0.50;transparent:true');
+      cellEntity.appendChild(nuc);
+
+      /* Golgi (three plates) */
+      const golgiData=[
+        {w:.55,d:.32,y:.25,c:'#cd853f'},
+        {w:.42,d:.26,y:.17,c:'#d2b48c'},
+        {w:.34,d:.22,y:.09,c:'#deb887'}
+      ];
+      golgiData.forEach(g=>{
+        const plate=document.createElement('a-box');
+        plate.setAttribute('width',g.w);
+        plate.setAttribute('height',0.05);
+        plate.setAttribute('depth',g.d);
+        plate.setAttribute('position',`-0.55 ${g.y} 0`);
+        plate.setAttribute('material',`color:${g.c};opacity:0.80`);
+        cellEntity.appendChild(plate);
+      });
+
+      /* mitochondria */
+      const mitoInfo=[
+        {pos:'0.55 -0.33 0.25',rot:'0 0 90'},
+        {pos:'0.48 0.40 -0.30',rot:'60 30 20'}
+      ];
+      mitoInfo.forEach(m=>{
+        const cyl=document.createElement('a-cylinder');
+        cyl.setAttribute('radius','0.12');
+        cyl.setAttribute('height','0.45');
+        cyl.setAttribute('position',m.pos);
+        cyl.setAttribute('rotation',m.rot);
+        cyl.setAttribute('material','color:#ff8c00;opacity:0.85');
+        cellEntity.appendChild(cyl);
       });
     }
-    function reset(){
-      timers.forEach(clearTimeout);timers=[];
-      document.querySelectorAll('#cell a-sphere[id^="s"]')
-        .forEach(s=>s.setAttribute('color','#888'));
+
+    /* --- build 50‑node network ------------------------------------------------------ */
+    const N_NODES = 50;
+    const nodePositions = [];            // [ {id:'n0', x,y,z}, ... ]
+    const edges = [];                     // [ {id:'e0', a:0, b:7}, ... ]
+    const visited = new Set();           // BFS propagation
+
+    function rnd(min,max){return Math.random()*(max-min)+min;}
+
+    function buildNetwork() {
+      /* receptor on TOP face */
+      nodePositions.push({id:'n0',x:0,y:0.80,z:0});  // first node
+
+      /* random scatter inside cube */
+      while(nodePositions.length < N_NODES){
+        const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
+        nodePositions.push({id:`n${nodePositions.length}`,x,y,z});
+      }
+
+      /* create node entities */
+      nodePositions.forEach(n=>{
+        const s=document.createElement('a-sphere');
+        s.setAttribute('id',n.id);
+        s.setAttribute('radius','0.06');
+        s.setAttribute('color','#888');
+        s.setAttribute('position',`${n.x} ${n.y} ${n.z}`);
+        cellEntity.appendChild(s);
+      });
+
+      /* simple neighbour graph: each node connects to its 3 closest later nodes */
+      for(let i=0;i<N_NODES;i++){
+        const n=nodePositions[i];
+        const dists=nodePositions.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}));
+        dists.sort((a,b)=>a.dist-b.dist);
+        let added=0;
+        for(let k=1;k<dists.length && added<3;k++){     // skip k=0 (itself)
+          const j=dists[k].j;
+          if(j<i) continue;                             // create edge only once
+          edges.push({id:`e${edges.length}`,a:i,b:j});
+          added++;
+        }
+      }
+
+      /* create edge entities with meshline */
+      edges.forEach(e=>{
+        const a=nodePositions[e.a], b=nodePositions[e.b];
+        const el=document.createElement('a-entity');
+        el.setAttribute('id',e.id);
+        el.setAttribute('meshline',`lineWidth:8; path:${a.x} ${a.y} ${a.z}, ${b.x} ${b.y} ${b.z}; color:#666`);
+        cellEntity.appendChild(el);
+      });
     }
 
-    /* marker‑UI logic */
-    const scene=document.querySelector('a-scene');
-    const marker=document.getElementById('hiroMarker');
-    const cell=document.getElementById('cell');
-    const status=document.getElementById('status');
-    const loader=document.getElementById('loader');
+    /* --- signal propagation --------------------------------------------------------- */
+    let timers=[];
+    function bfsPropagation(){
+      /* breadth‑first from node 0 */
+      const queue=[[0]];
+      visited.clear(); visited.add(0);
+      while(queue[queue.length-1].length){
+        const wave=[];
+        queue[queue.length-1].forEach(i=>{
+          edges.forEach(e=>{
+            const nb = (e.a===i ? e.b : e.b===i ? e.a : null);
+            if(nb!==null && !visited.has(nb)){
+              visited.add(nb); wave.push(nb);
+            }
+          });
+        });
+        if(wave.length) queue.push(wave);
+        else break;
+      }
 
-    scene.addEventListener('loaded',()=>loader.style.display='none');
+      /* animate waves */
+      queue.forEach((wave,w)=>{
+        timers.push(setTimeout(()=>{
+          wave.forEach(i=>{
+            document.getElementById(nodePositions[i].id)
+                    .setAttribute('color','#ff0000');
+          });
+          /* edges turn red when BOTH ends already red */
+          edges.forEach(e=>{
+            const na=document.getElementById(nodePositions[e.a].id);
+            const nb=document.getElementById(nodePositions[e.b].id);
+            if(na.getAttribute('color')==='#ff0000' && nb.getAttribute('color')==='#ff0000'){
+              document.getElementById(e.id).setAttribute('meshline',
+                 `lineWidth:8; color:#ff0000; path:`+
+                 `${na.object3D.position.x} ${na.object3D.position.y} ${na.object3D.position.z},`+
+                 `${nb.object3D.position.x} ${nb.object3D.position.y} ${nb.object3D.position.z}`);
+            }
+          });
+        },w*600));
+      });
+    }
+    function resetNetwork(){
+      timers.forEach(clearTimeout); timers=[];
+      nodePositions.forEach(n=>{
+        const s=document.getElementById(n.id);
+        if(s) s.setAttribute('color','#888');
+      });
+      edges.forEach(e=>{
+        const line=document.getElementById(e.id);
+        if(line){
+          const a=nodePositions[e.a], b=nodePositions[e.b];
+          line.setAttribute('meshline',
+            `lineWidth:8; color:#666; path:${a.x} ${a.y} ${a.z}, ${b.x} ${b.y} ${b.z}`);
+        }
+      });
+    }
+
+    /* --- build once scene has loaded ------------------------------------------------ */
+    scene.addEventListener('loaded',()=>{
+      loader.style.display='none';
+      addStaticOrganelles();
+      buildNetwork();
+    });
+
+    /* --- marker events -------------------------------------------------------------- */
     marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      status.textContent='Success';
-      propagate();
+      cellEntity.setAttribute('visible',true);
+      statusTxt.textContent='Success';
+      bfsPropagation();
     });
     marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      status.textContent='Searching…';
-      reset();
+      cellEntity.setAttribute('visible',false);
+      statusTxt.textContent='Searching…';
+      resetNetwork();
     });
   </script>
 </body>
