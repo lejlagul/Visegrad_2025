@@ -2,38 +2,33 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Marker‑triggered cube + label</title>
+    <title>Hiro‑poster demo</title>
 
-    <!-- current libraries -->
+    <!-- current, compatible libraries -->
     <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ar-js@3.4.7/aframe/build/aframe-ar.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
     <style>
-      body { margin: 0; overflow: hidden; }
-      #screen-number {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        font-family: monospace;
-        font-size: 24px;
-        color: #fff;
-        z-index: 1000;
-        pointer-events: none;
+      body { margin:0; overflow:hidden; }
+      #status {
+        position:fixed; top:10px; left:10px;
+        font:24px/1 monospace; color:#fff;
+        z-index:1000; pointer-events:none;
       }
     </style>
   </head>
 
   <body>
-    <!-- status label -->
-    <div id="screen-number">Searching…</div>
+    <!-- overlay text -->
+    <div id="status">Searching…</div>
 
     <!-- AR scene -->
-    <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
-            <a-marker id="patternMarker"
-                type="pattern"
-                url="hiro_marker.patt"
-                emitevents="true">
-        <!-- cube starts invisible; will be toggled by JS -->
+    <a-scene
+      embedded
+      arjs="trackingMethod: best; sourceType: webcam; debugUIEnabled:false;"
+    >
+      <a-marker id="hiro" preset="hiro" emitevents="true">
         <a-box id="cube"
                position="0 0.15 0"
                scale="0.3 0.3 0.3"
@@ -46,20 +41,19 @@
     </a-scene>
 
     <script>
-      const marker     = document.getElementById('hiroMarker');
-      const cube       = document.getElementById('cube');
-      const statusText = document.getElementById('screen-number');
+      const marker  = document.getElementById('hiro');
+      const cube    = document.getElementById('cube');
+      const status  = document.getElementById('status');
 
       marker.addEventListener('markerFound', () => {
         cube.setAttribute('visible', true);
-        statusText.textContent = 'Success';
+        status.textContent = 'Success';
       });
 
       marker.addEventListener('markerLost', () => {
         cube.setAttribute('visible', false);
-        statusText.textContent = 'Searching…';
+        status.textContent = 'Searching…';
       });
     </script>
   </body>
 </html>
-
