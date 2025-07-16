@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (2× scale, thick edges, auto‑restart)</title>
+  <title>Cubic cell – 50‑node network (2× scale, auto‑restart, meshline‑component)</title>
 
+  <!-- core libs -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  <!-- meshline component compatible with Three r173 -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-meshline-component@0.4.1/dist/aframe-meshline-component.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -28,8 +30,7 @@
   <div id="status">Searching…</div>
   <button id="resetBtn">Reset signal</button>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
-    <!-- cell is now uniformly scaled by 2× -->
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;" vr-mode-ui="enabled:false">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
     </a-marker>
@@ -68,7 +69,7 @@
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
-    const LINE_W=32;            // thicker edges for the 2× model
+    const LINE_W=0.04;          // meshline width in metres (≈4 cm)
 
     /* data */
     const nodes=[];   // {id,x,y,z,el}
@@ -102,7 +103,6 @@
     const rnd=(a,b)=>Math.random()*(b-a)+a;
 
     function buildNetwork(){
-      // hub node placed at the cube centre so it’s always visible
       nodes.push({id:'n0',x:0,y:0,z:0});
       while(nodes.length<N_NODES){
         nodes.push({id:`n${nodes.length}`,x:rnd(-0.6,0.6),y:rnd(-0.6,0.6),z:rnd(-0.6,0.6)});
@@ -125,7 +125,7 @@
           const path=`${n.x} ${n.y} ${n.z}, ${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
           cell.insertAdjacentHTML('beforeend',
             `<a-entity id="${id}"
-                       meshline="lineWidth:${LINE_W};path:${path};color:#666"></a-entity>`);
+                       meshline="lineWidth:${LINE_W}; path:${path}; color:#666"></a-entity>`);
           edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
@@ -135,8 +135,7 @@
     /* ---------------- propagation ---------------- */
     function resetColours(col){
       nodes.forEach(n=>n.el.setAttribute('color',col));
-      edges.forEach(e=>e.el.setAttribute('meshline',
-        e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:'+col)));
+      edges.forEach(e=>e.el.setAttribute('meshline','color',col));
     }
 
     function propagate(){
@@ -162,11 +161,10 @@
         timers.push(setTimeout(()=>{
           wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
           edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('color'),
-                  cb=nodes[e.b].el.getAttribute('color');
+            const ca=nodes[e.a].el.getAttribute('color');
+            const cb=nodes[e.b].el.getAttribute('color');
             if(ca==='#ff0000'&&cb==='#ff0000'){
-              e.el.setAttribute('meshline',
-                e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:#ff0000'));
+              e.el.setAttribute('meshline','color','#ff0000');
             }
           });
         },w*PROP_INTERVAL));
@@ -196,10 +194,4 @@
       resetNetwork();
     });
 
-    resetBtn.addEventListener('click',()=>{
-      resetNetwork();
-      propagate();                    // always restart cascade
-    });
-  </script>
-</body>
-</html>
+    resetBtn.addEventListener
