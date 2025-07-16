@@ -14,7 +14,8 @@
     #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
 
     button{padding:6px 12px;font:16px monospace;background:#222;color:#fff;
-           border:1px solid #888;border-radius:4px;opacity:0.85;z-index:1000}
+           border:1px solid #888;border-radius:4px;opacity:0.85;z-index:1000;cursor:pointer}
+    button:disabled{opacity:0.35;cursor:not-allowed}
 
     #startBtn{position:fixed;bottom:12px;left:12px}
     #resetBtn{position:fixed;bottom:12px;left:128px}
@@ -36,8 +37,9 @@
   <button id="zoomInBtn">+</button>
   <button id="zoomOutBtn">−</button>
 
-  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
+  <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;" vr-mode-ui="enabled:false">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
+      <!-- scalable container for everything -->
       <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
     </a-marker>
     <a-entity camera></a-entity>
@@ -65,7 +67,9 @@
   </script>
 
   <script>
-    /* handles & constants */
+    /* -------------------------------------------------- */
+    /* handles & constants                                */
+    /* -------------------------------------------------- */
     const scene=document.querySelector('a-scene');
     const marker=document.getElementById('hiroMarker');
     const cell=document.getElementById('cell');
@@ -95,7 +99,9 @@
       cell.setAttribute('scale',`${currentScale} ${currentScale} ${currentScale}`);
     }
 
-    /* ---------------- static organelles ---------------- */
+    /* -------------------------------------------------- */
+    /* static organelles                                  */
+    /* -------------------------------------------------- */
     function addOrganelles(){
       cell.insertAdjacentHTML('beforeend',
         `<a-box width="1.6" height="1.6" depth="1.6"
@@ -118,7 +124,9 @@
                        material="color:#ff8c00;opacity:0.85"></a-cylinder>`));
     }
 
-    /* ---------------- network ---------------- */
+    /* -------------------------------------------------- */
+    /* network                                            */
+    /* -------------------------------------------------- */
     const rnd=(a,b)=>Math.random()*(b-a)+a;
 
     function buildNetwork(){
@@ -151,7 +159,9 @@
       });
     }
 
-    /* ---------------- propagation ---------------- */
+    /* -------------------------------------------------- */
+    /* propagation logic                                   */
+    /* -------------------------------------------------- */
     function resetColours(col){
       nodes.forEach(n=>n.el.setAttribute('color',col));
       edges.forEach(e=>e.el.setAttribute('meshline',
