@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (2× scale, thick edges, auto‑restart)</title>
+  <title>Cubic cell – 50‑node network (2× scale, manual start, zoom)</title>
 
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
@@ -12,9 +12,15 @@
   <style>
     body{margin:0;overflow:hidden;font-family:monospace}
     #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
-    #resetBtn{position:fixed;bottom:12px;left:12px;padding:6px 12px;font:16px monospace;
-              background:#222;color:#fff;border:1px solid #888;border-radius:4px;opacity:0.85;
-              z-index:1000}
+
+    button{padding:6px 12px;font:16px monospace;background:#222;color:#fff;
+           border:1px solid #888;border-radius:4px;opacity:0.85;z-index:1000}
+
+    #startBtn{position:fixed;bottom:12px;left:12px}
+    #resetBtn{position:fixed;bottom:12px;left:128px}
+    #zoomInBtn{position:fixed;bottom:12px;right:48px}
+    #zoomOutBtn{position:fixed;bottom:12px;right:12px}
+
     #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
             align-items:center;background:#000}
     .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
@@ -22,14 +28,15 @@
     @keyframes spin{to{transform:rotate(360deg)}}
   </style>
 </head>
-
 <body>
-  <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
+  <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
   <div id="status">Searching…</div>
-  <button id="resetBtn">Reset signal</button>
+  <button id="startBtn" disabled>Start signal</button>
+  <button id="resetBtn" disabled>Reset signal</button>
+  <button id="zoomInBtn">+</button>
+  <button id="zoomOutBtn">−</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
-    <!-- cell is now uniformly scaled by 2× -->
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
     </a-marker>
@@ -64,16 +71,29 @@
     const cell=document.getElementById('cell');
     const status=document.getElementById('status');
     const loader=document.getElementById('loader');
+    const startBtn=document.getElementById('startBtn');
     const resetBtn=document.getElementById('resetBtn');
+    const zoomInBtn=document.getElementById('zoomInBtn');
+    const zoomOutBtn=document.getElementById('zoomOutBtn');
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
     const LINE_W=32;            // thicker edges for the 2× model
 
+    const MIN_SCALE=0.5;
+    const MAX_SCALE=4;
+    const SCALE_STEP=0.2;
+    let currentScale=2;
+
     /* data */
     const nodes=[];   // {id,x,y,z,el}
     const edges=[];   // {id,a,b,el}
     let timers=[];
+
+    /* utility */
+    function applyScale(){
+      cell.setAttribute('scale',`${currentScale} ${currentScale} ${currentScale}`);
+    }
 
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
@@ -102,7 +122,6 @@
     const rnd=(a,b)=>Math.random()*(b-a)+a;
 
     function buildNetwork(){
-      // hub node placed at the cube centre so it’s always visible
       nodes.push({id:'n0',x:0,y:0,z:0});
       while(nodes.length<N_NODES){
         nodes.push({id:`n${nodes.length}`,x:rnd(-0.6,0.6),y:rnd(-0.6,0.6),z:rnd(-0.6,0.6)});
@@ -155,51 +174,4 @@
             }
           });
         });
-        if(nxt.length)waves.push(nxt);else break;
-      }
-
-      waves.forEach((wave,w)=>{
-        timers.push(setTimeout(()=>{
-          wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
-          edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('color'),
-                  cb=nodes[e.b].el.getAttribute('color');
-            if(ca==='#ff0000'&&cb==='#ff0000'){
-              e.el.setAttribute('meshline',
-                e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:#ff0000'));
-            }
-          });
-        },w*PROP_INTERVAL));
-      });
-    }
-
-    function resetNetwork(){
-      timers.forEach(clearTimeout);timers=[];
-      resetColours('#666');
-    }
-
-    /* ---------------- lifecycle ---------------- */
-    scene.addEventListener('loaded',()=>{
-      loader.style.display='none';
-      addOrganelles();
-      buildNetwork();
-    });
-
-    marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      status.textContent='Success';
-      propagate();
-    });
-    marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      status.textContent='Searching…';
-      resetNetwork();
-    });
-
-    resetBtn.addEventListener('click',()=>{
-      resetNetwork();
-      propagate();                    // always restart cascade
-    });
-  </script>
-</body>
-</html>
+        if(nxt.length)waves.push
