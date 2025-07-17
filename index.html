@@ -68,7 +68,8 @@
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
-    const LINE_W=32;            // thicker edges for the 2× model
+    const LINE_W=32;            // network edge width
+    const CUBE_EDGE_W=64;       // cube edges & cytoskeleton thickness
 
     /* data */
     const nodes=[];   // {id,x,y,z,el}
@@ -77,10 +78,31 @@
 
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
-    cell.insertAdjacentHTML('beforeend',
-      `<a-box width="1.6" height="1.6" depth="1.6"
-              material="color:#00ffff; wireframe:true"></a-box>`);
+      // Cube edges (12)
+      const h=0.8; // half length (cube 1.6)
+      const segments=[
+        // vertical edges
+        [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+        [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+        // top square
+        [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+        [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+        // bottom square
+        [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+        [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]
+      ];
+      segments.forEach(pair=>{
+        const path=`${pair[0].join(' ')} , ${pair[1].join(' ')}`;
+        cell.insertAdjacentHTML('beforeend',
+          `<a-entity meshline="lineWidth:${CUBE_EDGE_W};path:${path};color:#00ffff"></a-entity>`);
+      });
 
+      // Nucleus as disc
+      cell.insertAdjacentHTML('beforeend',
+        `<a-circle radius="0.45" rotation="-90 0 0"
+                   material="color:#800080;opacity:0.50;transparent:true;side:double"></a-circle>`);
+
+      // Golgi apparatus
       const golgi=[.55,.42,.34];
       golgi.forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
@@ -89,11 +111,24 @@
                   material="color:#cd853f;opacity:0.80"></a-box>`);
       });
 
-      [['0.55 -0.33 0.25','0 0 90'],['0.48 0.40 -0.30','60 30 20']]
+      // Mitochondria
+      [["0.55 -0.33 0.25","0 0 90"],["0.48 0.40 -0.30","60 30 20"]]
         .forEach(m=>cell.insertAdjacentHTML('beforeend',
           `<a-cylinder radius="0.12" height="0.45"
                        position="${m[0]}" rotation="${m[1]}"
                        material="color:#ff8c00;opacity:0.85"></a-cylinder>`));
+    }
+
+    /* ---------------- cytoskeleton ---------------- */
+    function addCytoskeleton(){
+      const rnd=(a,b)=>Math.random()*(b-a)+a;
+      for(let i=0;i<90;i++){
+        const ax=rnd(-0.75,0.75), ay=rnd(-0.75,0.75), az=rnd(-0.75,0.75);
+        const bx=rnd(-0.75,0.75), by=rnd(-0.75,0.75), bz=rnd(-0.75,0.75);
+        const path=`${ax} ${ay} ${az}, ${bx} ${by} ${bz}`;
+        cell.insertAdjacentHTML('beforeend',
+          `<a-entity meshline="lineWidth:${CUBE_EDGE_W/4};path:${path};color:#00ffff"></a-entity>`);
+      }
     }
 
     /* ---------------- network ---------------- */
@@ -180,6 +215,7 @@
     scene.addEventListener('loaded',()=>{
       loader.style.display='none';
       addOrganelles();
+      addCytoskeleton();
       buildNetwork();
     });
 
