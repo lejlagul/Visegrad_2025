@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (built‑in line component)</title>
+  <title>Cubic cell – 50‑node network (no cytoskeleton)</title>
 
-  <!-- A‑Frame + AR.js → no meshline needed -->
+  <!-- A‑Frame + AR.js, built‑in line component only -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
@@ -110,17 +110,6 @@
                        material="color:#ff8c00;opacity:0.85"></a-cylinder>`));
     }
 
-    /* ---------------- cytoskeleton ---------------- */
-    function addCytoskeleton(){
-      const rnd=(a,b)=>Math.random()*(b-a)+a;
-      for(let i=0;i<90;i++){
-        const a=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
-        const b=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
-        cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start: ${a.join(' ')}; end: ${b.join(' ')}; color: #00ffff; opacity: 0.8"></a-entity>`);
-      }
-    }
-
     /* ---------------- network ---------------- */
     const rnd=(a,b)=>Math.random()*(b-a)+a;
 
@@ -183,44 +172,4 @@
         timers.push(setTimeout(()=>{
           wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
           edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('color'),
-                  cb=nodes[e.b].el.getAttribute('color');
-            if(ca==='#ff0000'&&cb==='#ff0000'){
-              e.el.setAttribute('line','color: #ff0000');
-            }
-          });
-        },w*PROP_INTERVAL));
-      });
-    }
-
-    function resetNetwork(){
-      timers.forEach(clearTimeout);timers=[];
-      resetColours('#666');
-    }
-
-    /* ---------------- lifecycle ---------------- */
-    scene.addEventListener('loaded',()=>{
-      loader.style.display='none';
-      addOrganelles();
-      addCytoskeleton();
-      buildNetwork();
-    });
-
-    marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      status.textContent='Success';
-      propagate();
-    });
-    marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      status.textContent='Searching…';
-      resetNetwork();
-    });
-
-    resetBtn.addEventListener('click',()=>{
-      resetNetwork();
-      propagate();
-    });
-  </script>
-</body>
-</html>
+            const ca=nodes[e.a].el.getAttribute('
