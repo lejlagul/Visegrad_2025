@@ -5,6 +5,7 @@
   <title>Cubic cell – 50‑node network (built‑in line component)</title>
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  <script src="https://raw.githack.com/spite/aframe-meshline-component/master/dist/aframe-meshline-component.min.js"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body{margin:0;overflow:hidden;font-family:monospace}
@@ -64,7 +65,7 @@
     let timers=[];
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
-      // Cube edges (12) using built‑in <a-entity line>
+      // Cube edges (12) using meshline for thickness
       const h=0.8; // half-length of cube (1.6)
       const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
                  [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
@@ -75,7 +76,7 @@
       seg.forEach(p=>{
         const s=p[0].join(' '), e=p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start: ${s}; end: ${e}; color: #00ffff"></a-entity>`);
+          `<a-entity meshline="path: ${s}, ${e}; color: #00ffff; lineWidth: 0.05"></a-entity>`);
       });
       // Nucleus as disc
       cell.insertAdjacentHTML('beforeend',
@@ -102,7 +103,7 @@
         const a=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
         const b=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start: ${a.join(' ')}; end: ${b.join(' ')}; color: #00ffff; transparent: true; opacity: 0.3"></a-entity>`);
+          `<a-entity line="start: ${a.join(' ')}; end: ${b.join(' ')}; color: #00ffff; opacity: 0.8"></a-entity>`);
       }
     }
     /* ---------------- network ---------------- */
