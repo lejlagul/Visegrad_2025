@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (built‑in line component)</title>
+  <title>Cubic cell – thick cube edges vs. thin network links</title>
 
-  <!-- A‑Frame + AR.js → no meshline needed -->
+  <!-- A‑Frame + AR.js (no aframe‑meshline) -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
@@ -67,6 +67,7 @@
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
+    const EDGE_THICK=0.06;      // cube edge thickness (in units) – visibly thicker than lines
 
     /* data */
     const nodes=[];   // {id,x,y,z,el}
@@ -75,26 +76,42 @@
 
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
-      // Cube edges (12) using built‑in <a-entity line>
-      const h=0.8; // half-length of cube (1.6)
-      const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-                 [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-                 [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-                 [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-                 [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-                 [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
-      seg.forEach(p=>{
-        const s=p[0].join(' '), e=p[1].join(' ');
-        cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start: ${s}; end: ${e}; color: #00ffff"></a-entity>`);
-      });
+      /* 1. Cube edges as slim rectangular prisms (much thicker than 1‑px lines) */
+      const h=0.8;               // half‑length (cube is 1.6 units on a side)
+      const t=EDGE_THICK;        // thickness used for narrow box edges
 
-      // Nucleus as disc
+      // helper to add an edge box
+      const edgeBox=(x,y,z,w,hgt,d)=>{
+        cell.insertAdjacentHTML('beforeend',
+          `<a-box width="${w}" height="${hgt}" depth="${d}"
+                  position="${x} ${y} ${z}"
+                  material="color:#00ffff"></a-box>`);
+      };
+
+      // vertical edges (along Y)
+      edgeBox(-h,0,-h, t,1.6,t);
+      edgeBox( h,0,-h, t,1.6,t);
+      edgeBox(-h,0, h, t,1.6,t);
+      edgeBox( h,0, h, t,1.6,t);
+
+      // top face edges
+      edgeBox( 0 , h,-h,1.6,t,t);             // along X
+      edgeBox( h , h, 0, t,t,1.6);            // along Z
+      edgeBox( 0 , h, h,1.6,t,t);             // along X
+      edgeBox(-h, h, 0, t,t,1.6);             // along Z
+
+      // bottom face edges
+      edgeBox( 0 ,-h,-h,1.6,t,t);             // along X
+      edgeBox( h ,-h, 0, t,t,1.6);            // along Z
+      edgeBox( 0 ,-h, h,1.6,t,t);             // along X
+      edgeBox(-h,-h, 0, t,t,1.6);             // along Z
+
+      /* 2. Nucleus as disc */
       cell.insertAdjacentHTML('beforeend',
         `<a-circle radius="0.45" rotation="-90 0 0"
                    material="color:#800080;opacity:0.5;transparent:true;side:double"></a-circle>`);
 
-      // Golgi apparatus
+      /* 3. Golgi apparatus */
       [0.55,0.42,0.34].forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
           `<a-box width="${w}" height="0.05" depth="${w*0.58}"
@@ -102,7 +119,7 @@
                   material="color:#cd853f;opacity:0.8"></a-box>`);
       });
 
-      // Mitochondria
+      /* 4. Mitochondria */
       [["0.55 -0.33 0.25","0 0 90"],["0.48 0.40 -0.30","60 30 20"]]
         .forEach(m=>cell.insertAdjacentHTML('beforeend',
           `<a-cylinder radius="0.12" height="0.45"
@@ -170,57 +187,4 @@
         const nxt=[];
         waves[waves.length-1].forEach(i=>{
           edges.forEach(e=>{
-            const nb=(e.a===i?e.b:e.b===i?e.a:null);
-            if(nb!==null && !visited.has(nb)){
-              visited.add(nb);nxt.push(nb);
-            }
-          });
-        });
-        if(nxt.length)waves.push(nxt);else break;
-      }
-
-      waves.forEach((wave,w)=>{
-        timers.push(setTimeout(()=>{
-          wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
-          edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('color'),
-                  cb=nodes[e.b].el.getAttribute('color');
-            if(ca==='#ff0000'&&cb==='#ff0000'){
-              e.el.setAttribute('line','color: #ff0000');
-            }
-          });
-        },w*PROP_INTERVAL));
-      });
-    }
-
-    function resetNetwork(){
-      timers.forEach(clearTimeout);timers=[];
-      resetColours('#666');
-    }
-
-    /* ---------------- lifecycle ---------------- */
-    scene.addEventListener('loaded',()=>{
-      loader.style.display='none';
-      addOrganelles();
-      addCytoskeleton();
-      buildNetwork();
-    });
-
-    marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      status.textContent='Success';
-      propagate();
-    });
-    marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      status.textContent='Searching…';
-      resetNetwork();
-    });
-
-    resetBtn.addEventListener('click',()=>{
-      resetNetwork();
-      propagate();
-    });
-  </script>
-</body>
-</html>
+            const nb=(e.a===i?
