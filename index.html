@@ -77,11 +77,9 @@
 
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
-      cell.insertAdjacentHTML('beforeend',
-        `<a-box width="1.6" height="1.6" depth="1.6"
-                material="color:#00ffff;opacity:0.10;transparent:true;side:double"></a-box>
-         <a-sphere radius="0.45"
-                   material="color:#800080;opacity:0.50;transparent:true"></a-sphere>`);
+    cell.insertAdjacentHTML('beforeend',
+      `<a-box width="1.6" height="1.6" depth="1.6"
+              material="color:#00ffff; wireframe:true"></a-box>`);
 
       const golgi=[.55,.42,.34];
       golgi.forEach((w,i)=>{
