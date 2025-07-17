@@ -1,10 +1,10 @@
-<!DOCTYPE html>
+'<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (no cytoskeleton)</title>
+  <title>Cubic cell – 50‑node network (built‑in line component)</title>
 
-  <!-- A‑Frame + AR.js, built‑in line component only -->
+  <!-- A‑Frame + AR.js → no meshline needed -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
@@ -86,28 +86,28 @@
       seg.forEach(p=>{
         const s=p[0].join(' '), e=p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start: ${s}; end: ${e}; color: #00ffff"></a-entity>`);
+          <a-entity line="start: ${s}; end: ${e}; color: #00ffff"></a-entity>);
       });
 
       // Nucleus as disc
       cell.insertAdjacentHTML('beforeend',
-        `<a-circle radius="0.45" rotation="-90 0 0"
-                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-circle>`);
+        <a-circle radius="0.45" rotation="-90 0 0"
+                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-circle>);
 
       // Golgi apparatus
       [0.55,0.42,0.34].forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
-          `<a-box width="${w}" height="0.05" depth="${w*0.58}"
+          <a-box width="${w}" height="0.05" depth="${w*0.58}"
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
-                  material="color:#cd853f;opacity:0.8"></a-box>`);
+                  material="color:#cd853f;opacity:0.8"></a-box>);
       });
 
       // Mitochondria
       [["0.55 -0.33 0.25","0 0 90"],["0.48 0.40 -0.30","60 30 20"]]
         .forEach(m=>cell.insertAdjacentHTML('beforeend',
-          `<a-cylinder radius="0.12" height="0.45"
+          <a-cylinder radius="0.12" height="0.45"
                        position="${m[0]}" rotation="${m[1]}"
-                       material="color:#ff8c00;opacity:0.85"></a-cylinder>`));
+                       material="color:#ff8c00;opacity:0.85"></a-cylinder>));
     }
 
     /* ---------------- network ---------------- */
@@ -116,13 +116,13 @@
     function buildNetwork(){
       nodes.push({id:'n0',x:0,y:0,z:0}); // hub at centre
       while(nodes.length<N_NODES){
-        nodes.push({id:`n${nodes.length}`,x:rnd(-0.6,0.6),y:rnd(-0.6,0.6),z:rnd(-0.6,0.6)});
+        nodes.push({id:n${nodes.length},x:rnd(-0.6,0.6),y:rnd(-0.6,0.6),z:rnd(-0.6,0.6)});
       }
 
       nodes.forEach(n=>{
         cell.insertAdjacentHTML('beforeend',
-          `<a-sphere id="${n.id}" radius="0.06" color="#888"
-                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+          <a-sphere id="${n.id}" radius="0.06" color="#888"
+                     position="${n.x} ${n.y} ${n.z}"></a-sphere>);
         n.el=document.getElementById(n.id);
       });
 
@@ -132,11 +132,11 @@
         let added=0;
         for(let k=1;k<d.length&&added<3;k++){
           const j=d[k].j;if(j<i)continue;
-          const id=`e${edges.length}`;
-          const s=`${n.x} ${n.y} ${n.z}`;
-          const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
+          const id=e${edges.length};
+          const s=${n.x} ${n.y} ${n.z};
+          const e=${nodes[j].x} ${nodes[j].y} ${nodes[j].z};
           cell.insertAdjacentHTML('beforeend',
-            `<a-entity id="${id}" line="start: ${s}; end: ${e}; color: #666"></a-entity>`);
+            <a-entity id="${id}" line="start: ${s}; end: ${e}; color: #666"></a-entity>);
           edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
@@ -172,4 +172,43 @@
         timers.push(setTimeout(()=>{
           wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
           edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('
+            const ca=nodes[e.a].el.getAttribute('color'),
+                  cb=nodes[e.b].el.getAttribute('color');
+            if(ca==='#ff0000'&&cb==='#ff0000'){
+              e.el.setAttribute('line','color: #ff0000');
+            }
+          });
+        },w*PROP_INTERVAL));
+      });
+    }
+
+    function resetNetwork(){
+      timers.forEach(clearTimeout);timers=[];
+      resetColours('#666');
+    }
+
+    /* ---------------- lifecycle ---------------- */
+    scene.addEventListener('loaded',()=>{
+      loader.style.display='none';
+      addOrganelles();
+      buildNetwork();
+    });
+
+    marker.addEventListener('markerFound',()=>{
+      cell.setAttribute('visible',true);
+      status.textContent='Success';
+      propagate();
+    });
+    marker.addEventListener('markerLost',()=>{
+      cell.setAttribute('visible',false);
+      status.textContent='Searching…';
+      resetNetwork();
+    });
+
+    resetBtn.addEventListener('click',()=>{
+      resetNetwork();
+      propagate();
+    });
+  </script>
+</body>
+</html>
