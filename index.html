@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50‑node network (2× scale, thick edges, auto‑restart)</title>
+  <title>Cubic cell – 50‑node network (built‑in line component)</title>
 
+  <!-- A‑Frame + AR.js → no meshline needed -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/aframe-meshline@1.2.0/dist/aframe-meshline.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
@@ -29,7 +29,6 @@
   <button id="resetBtn">Reset signal</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
-    <!-- cell is now uniformly scaled by 2× -->
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
     </a-marker>
@@ -68,8 +67,6 @@
 
     const N_NODES=50;
     const PROP_INTERVAL=1200;   // ms between waves
-    const LINE_W=32;            // network edge width
-    const CUBE_EDGE_W=64;       // cube edges & cytoskeleton thickness
 
     /* data */
     const nodes=[];   // {id,x,y,z,el}
@@ -78,37 +75,31 @@
 
     /* ---------------- static organelles ---------------- */
     function addOrganelles(){
-      // Cube edges (12)
-      const h=0.8; // half length (cube 1.6)
-      const segments=[
-        // vertical edges
-        [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-        [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-        // top square
-        [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-        [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-        // bottom square
-        [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-        [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]
-      ];
-      segments.forEach(pair=>{
-        const path=`${pair[0].join(' ')} , ${pair[1].join(' ')}`;
+      // Cube edges (12) using built‑in <a-entity line>
+      const h=0.8; // half-length of cube (1.6)
+      const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+                 [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+                 [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+                 [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+                 [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+                 [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
+      seg.forEach(p=>{
+        const s=p[0].join(' '), e=p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="lineWidth:${CUBE_EDGE_W};path:${path};color:#00ffff"></a-entity>`);
+          `<a-entity line="start: ${s}; end: ${e}; color: #00ffff"></a-entity>`);
       });
 
       // Nucleus as disc
       cell.insertAdjacentHTML('beforeend',
         `<a-circle radius="0.45" rotation="-90 0 0"
-                   material="color:#800080;opacity:0.50;transparent:true;side:double"></a-circle>`);
+                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-circle>`);
 
       // Golgi apparatus
-      const golgi=[.55,.42,.34];
-      golgi.forEach((w,i)=>{
+      [0.55,0.42,0.34].forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
           `<a-box width="${w}" height="0.05" depth="${w*0.58}"
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
-                  material="color:#cd853f;opacity:0.80"></a-box>`);
+                  material="color:#cd853f;opacity:0.8"></a-box>`);
       });
 
       // Mitochondria
@@ -123,11 +114,10 @@
     function addCytoskeleton(){
       const rnd=(a,b)=>Math.random()*(b-a)+a;
       for(let i=0;i<90;i++){
-        const ax=rnd(-0.75,0.75), ay=rnd(-0.75,0.75), az=rnd(-0.75,0.75);
-        const bx=rnd(-0.75,0.75), by=rnd(-0.75,0.75), bz=rnd(-0.75,0.75);
-        const path=`${ax} ${ay} ${az}, ${bx} ${by} ${bz}`;
+        const a=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
+        const b=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="lineWidth:${CUBE_EDGE_W/4};path:${path};color:#00ffff"></a-entity>`);
+          `<a-entity line="start: ${a.join(' ')}; end: ${b.join(' ')}; color: #00ffff; opacity: 0.8"></a-entity>`);
       }
     }
 
@@ -135,8 +125,7 @@
     const rnd=(a,b)=>Math.random()*(b-a)+a;
 
     function buildNetwork(){
-      // hub node placed at the cube centre so it’s always visible
-      nodes.push({id:'n0',x:0,y:0,z:0});
+      nodes.push({id:'n0',x:0,y:0,z:0}); // hub at centre
       while(nodes.length<N_NODES){
         nodes.push({id:`n${nodes.length}`,x:rnd(-0.6,0.6),y:rnd(-0.6,0.6),z:rnd(-0.6,0.6)});
       }
@@ -155,10 +144,10 @@
         for(let k=1;k<d.length&&added<3;k++){
           const j=d[k].j;if(j<i)continue;
           const id=`e${edges.length}`;
-          const path=`${n.x} ${n.y} ${n.z}, ${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
+          const s=`${n.x} ${n.y} ${n.z}`;
+          const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
           cell.insertAdjacentHTML('beforeend',
-            `<a-entity id="${id}"
-                       meshline="lineWidth:${LINE_W};path:${path};color:#666"></a-entity>`);
+            `<a-entity id="${id}" line="start: ${s}; end: ${e}; color: #666"></a-entity>`);
           edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
@@ -168,8 +157,7 @@
     /* ---------------- propagation ---------------- */
     function resetColours(col){
       nodes.forEach(n=>n.el.setAttribute('color',col));
-      edges.forEach(e=>e.el.setAttribute('meshline',
-        e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:'+col)));
+      edges.forEach(e=>e.el.setAttribute('line','color: '+col));
     }
 
     function propagate(){
@@ -198,8 +186,7 @@
             const ca=nodes[e.a].el.getAttribute('color'),
                   cb=nodes[e.b].el.getAttribute('color');
             if(ca==='#ff0000'&&cb==='#ff0000'){
-              e.el.setAttribute('meshline',
-                e.el.getAttribute('meshline').replace(/color:[^;]+/,'color:#ff0000'));
+              e.el.setAttribute('line','color: #ff0000');
             }
           });
         },w*PROP_INTERVAL));
@@ -232,7 +219,7 @@
 
     resetBtn.addEventListener('click',()=>{
       resetNetwork();
-      propagate();                    // always restart cascade
+      propagate();
     });
   </script>
 </body>
