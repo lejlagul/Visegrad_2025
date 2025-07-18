@@ -142,7 +142,7 @@
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
       /* START NODE – bright yellow star billboard at top centre */
-      const startY = 0.78;   // slightly beneath +h = 0.8
+      const startY = 0.9;   // place slightly above membrane so it's fully visible   // slightly beneath +h = 0.8
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
 
       /* block around nucleus – avoid inside bottom nucleus */
@@ -161,9 +161,9 @@
         if(n.type==='star'){
           cell.insertAdjacentHTML('beforeend',
             `<a-entity id="${n.id}"
-                      text="value:★; color:#ffff00; align:center; anchor:center; baseline:center; side:double"
+                      text="value: ★; color: #ffff00; align: center; anchor: center; baseline: center; side: double; shader: flat; width: 1.5"
                       position="${n.x} ${n.y} ${n.z}"
-                      scale="0.6 0.6 0.6" look-at="#cam"></a-entity>`);
+                      scale="1 1 1"></a-entity>`);
         }else{
           cell.insertAdjacentHTML('beforeend',
             `<a-sphere id="${n.id}" radius="0.06" color="#888" position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
