@@ -92,7 +92,7 @@
     function addOrganelles(){
       /* cube “cell wall” – THICK EDGES */
       const h = 0.8;
-      const EDGE_WIDTH = 0.025;            // metres – tweak for thickness
+      const EDGE_WIDTH = 0.05;            // metres – thicker edge for better visibility            // metres – tweak for thickness
       const EDGE_COLOR = '#ffffff';        // bright so it stands out
       const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
                    [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
@@ -103,7 +103,7 @@
       seg.forEach(p=>{
         const s = p[0].join(' '), e = p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: false"></a-entity>`);
+          `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: true; worldUnits: true"></a-entity>`);
       });
 
       /* nucleus + membrane (bottom centre) */
