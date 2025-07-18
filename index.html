@@ -92,12 +92,25 @@
 
     /******** Static organelles (walls, nucleus, Golgi) ********/
     function addOrganelles(){
-      /* cube “cell wall” – single wireframe box (no meshline) */
-      const h = 0.8;
-      cell.insertAdjacentHTML('beforeend',
-        `<a-box depth="${2*h}" height="${2*h}" width="${2*h}"
-                position="0 0 0"
-                material="color:#ffffff; wireframe:true; wireframeLinewidth:3"></a-box>`);
+      /* cube “cell wall” – 12 small cylinders for thick, solid edges */
+      const h = 0.8;                   // half‑size of cube
+      const L = 2*h;                   // cylinder height (edge length)
+      const R = 0.035;                 // cylinder radius (edge thickness)
+      const edgeColor = '#ffffff';
+      // helper to add a cylinder edge
+      const addEdge = (x,y,z,rx,ry,rz)=>{
+        cell.insertAdjacentHTML('beforeend',
+          `<a-cylinder radius="${R}" height="${L}"
+                       position="${x} ${y} ${z}"
+                       rotation="${rx} ${ry} ${rz}"
+                       material="color:${edgeColor}"></a-cylinder>`);
+      };
+      // vertical edges (aligned with Y)
+      [-h,h].forEach(ix=>[-h,h].forEach(iz=>addEdge(ix,0,iz,0,0,0)));
+      // edges along X (rotate Z 90°)
+      [-h,h].forEach(iy=>[-h,h].forEach(iz=>addEdge(0,iy,iz,0,0,90)));
+      // edges along Z (rotate X 90°)
+      [-h,h].forEach(iy=>[-h,h].forEach(ix=>addEdge(ix,iy,0,90,0,0)));
 
       /* nucleus + membrane (bottom‑centre) */
       const nY = -0.55;
