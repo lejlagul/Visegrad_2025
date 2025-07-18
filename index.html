@@ -38,7 +38,7 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
+      <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
     </a-marker>
     <a-entity camera></a-entity>
   </a-scene>
@@ -81,7 +81,7 @@
     const resetBtn= document.getElementById('resetBtn');
     const startBtn= document.getElementById('startBtn');
 
-    const N_NODES      = 50;
+    const N_NODES      = 150;
     const PROP_INTERVAL= 1200;
 
     /* data stores */
