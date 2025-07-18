@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50-node network (thick edges)</title>
+  <title>Cubic cell – 150‑node network (star start)</title>
 
   <!-- A-Frame, AR.js and meshline -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -38,12 +38,13 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
+      <!-- doubled in size (scale 4) -->
       <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
     </a-marker>
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- drag-rotate component -->
+  <!-- drag‑rotate component -->
   <script>
     AFRAME.registerComponent('drag-rotate', {
       schema: { speed: { default: 1 } },
@@ -72,7 +73,7 @@
   </script>
 
   <script>
-    /* handles & constants */
+    /******** Handles & constants ********/
     const scene   = document.querySelector('a-scene');
     const marker  = document.getElementById('hiroMarker');
     const cell    = document.getElementById('cell');
@@ -81,19 +82,19 @@
     const resetBtn= document.getElementById('resetBtn');
     const startBtn= document.getElementById('startBtn');
 
-    const N_NODES      = 150;
-    const PROP_INTERVAL= 1200;
+    const N_NODES       = 150;   // total (including the star)
+    const PROP_INTERVAL = 1200;  // ms between propagation waves
 
     /* data stores */
     const nodes = [], edges = [];
     let timers  = [];
 
-    /* ---------- static organelles ---------- */
+    /******** Static organelles (walls, nucleus, Golgi) ********/
     function addOrganelles(){
-      /* cube “cell wall” – THICK EDGES */
+      /* cube “cell wall” – thick white mesh lines */
       const h = 0.8;
-      const EDGE_WIDTH = 0.05;            // metres – thicker edge for better visibility            // metres – tweak for thickness
-      const EDGE_COLOR = '#ffffff';        // bright so it stands out
+      const EDGE_WIDTH = 0.05;    // metres
+      const EDGE_COLOR = '#ffffff';
       const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
                    [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
                    [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
@@ -106,7 +107,7 @@
           `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: true; worldUnits: true"></a-entity>`);
       });
 
-      /* nucleus + membrane (bottom centre) */
+      /* nucleus + membrane (bottom‑centre) */
       const nY = -0.55;
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
@@ -115,23 +116,17 @@
                   material="color:#dda0dd;opacity:0.2;transparent:true;side:double"></a-sphere>
       `);
 
-      /* Golgi */
+      /* Golgi bodies */
       [0.55,0.42,0.34].forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
-          `<a-box width="${w}" height="0.05" depth="${w*0.58}"
+          `<a-box width="${w}" height="0.05" depth="${(w*0.58).toFixed(3)}"
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
                   material="color:#cd853f;opacity:0.8"></a-box>`);
       });
-
-      /* mitochondria → small blue spheres */
-      ["0.55 -0.33 0.25","0.48 0.40 -0.30"].forEach(pos=>{
-        cell.insertAdjacentHTML('beforeend',
-          `<a-sphere radius="0.10" position="${pos}"
-                     material="color:#1e90ff;opacity:0.85"></a-sphere>`);
-      });
+      /* (The two blue mitochondria were removed as requested) */
     }
 
-    /* ---------- cytoskeleton ---------- */
+    /******** Cytoskeleton (random cyan filaments) ********/
     function addCytoskeleton(){
       const rnd=(a,b)=>Math.random()*(b-a)+a;
       for(let i=0;i<90;i++){
@@ -142,32 +137,44 @@
       }
     }
 
-    /* ---------- network ---------- */
+    /******** Network generation ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      nodes.push({id:'n0',x:0,y:0,z:0});
+      /* START NODE – star at top centre (just inside membrane) */
+      const startY = 0.78;   // slightly beneath +h = 0.8
+      nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
+
+      /* block around nucleus – avoid inside bottom nucleus */
       const nC={x:0,y:-0.55,z:0}, nR=0.30;
 
+      /* fill the rest with random nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
         const d=Math.sqrt((x-nC.x)**2 + (y-nC.y)**2 + (z-nC.z)**2);
-        if(d<nR) continue;
-        nodes.push({id:`n${nodes.length}`,x,y,z});
+        if(d<nR) continue;            // skip if inside nucleus
+        nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
+      /* instantiate visuals */
       nodes.forEach(n=>{
-        cell.insertAdjacentHTML('beforeend',
-          `<a-sphere id="${n.id}" radius="0.06" color="#888"
-                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+        if(n.type==='star'){
+          cell.insertAdjacentHTML('beforeend',
+            `<a-entity id="${n.id}" text="value:★; color:#888; align:center; baseline:center"
+                      position="${n.x} ${n.y} ${n.z}" scale="0.3 0.3 0.3"></a-entity>`);
+        }else{
+          cell.insertAdjacentHTML('beforeend',
+            `<a-sphere id="${n.id}" radius="0.06" color="#888" position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+        }
         n.el=document.getElementById(n.id);
       });
 
+      /* connect each node to its three nearest neighbours (undirected) */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
                          .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
-          const j=dists[k].j;if(j<i)continue;
+          const j=dists[k].j;if(j<i)continue;  // avoid double‑adding
           const id=`e${edges.length}`;
           const s=`${n.x} ${n.y} ${n.z}`;
           const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
@@ -179,14 +186,23 @@
       });
     }
 
-    /* ---------- propagation ---------- */
+    /******** Colour‑reset / propagation helpers ********/
+    function setNodeColour(node, col){
+      if(node.el.hasAttribute('text')){
+        node.el.setAttribute('text',`color:${col}`);
+      }else{
+        node.el.setAttribute('color',col);
+      }
+    }
     function resetColours(col){
-      nodes.forEach(n=>n.el.setAttribute('color',col));
+      nodes.forEach(n=>setNodeColour(n,col));
       edges.forEach(e=>e.el.setAttribute('line',`color:${col}`));
     }
+
     function propagate(){
       timers.forEach(clearTimeout); timers=[];
       resetColours('#888');
+      /* breadth‑first waves from node 0 */
       const visited=new Set([0]), waves=[[0]];
       while(waves[waves.length-1].length){
         const nxt=[];
@@ -198,13 +214,14 @@
         });
         if(nxt.length) waves.push(nxt); else break;
       }
+      /* colour by wave */
       waves.forEach((wave,w)=>{
         timers.push(setTimeout(()=>{
-          wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
+          wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
           edges.forEach(e=>{
-            const ca=nodes[e.a].el.getAttribute('color');
-            const cb=nodes[e.b].el.getAttribute('color');
-            if(ca==='#ff0000'&&cb==='#ff0000')
+            const ca=nodes[e.a].el.hasAttribute('text') ? nodes[e.a].el.getAttribute('text').color : nodes[e.a].el.getAttribute('color');
+            const cb=nodes[e.b].el.hasAttribute('text') ? nodes[e.b].el.getAttribute('text').color : nodes[e.b].el.getAttribute('color');
+            if(ca==="#ff0000" && cb==="#ff0000")
               e.el.setAttribute('line','color:#ff0000');
           });
         },w*PROP_INTERVAL));
@@ -212,7 +229,7 @@
     }
     function resetNetwork(){timers.forEach(clearTimeout);timers=[];resetColours('#666');}
 
-    /* ---------- lifecycle ---------- */
+    /******** Lifecycle ********/
     scene.addEventListener('loaded',()=>{
       loader.style.display='none';
       addOrganelles();
