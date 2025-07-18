@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 150‑node network (visible star start)</title>
+  <title>Cubic cell – 100‑node network (wireframe cube)</title>
 
-  <!-- A-Frame, AR.js and meshline -->
+  <!-- A-Frame, AR.js, meshline (meshline kept for network edges only) -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
   <script src="https://raw.githack.com/spite/aframe-meshline-component/master/dist/aframe-meshline-component.min.js"></script>
@@ -83,7 +83,7 @@
     const resetBtn= document.getElementById('resetBtn');
     const startBtn= document.getElementById('startBtn');
 
-    const N_NODES       = 150;   // total (including the star)
+    const N_NODES       = 100;   // total (including the star)
     const PROP_INTERVAL = 1200;  // ms between propagation waves
 
     /* data stores */
@@ -92,21 +92,12 @@
 
     /******** Static organelles (walls, nucleus, Golgi) ********/
     function addOrganelles(){
-      /* cube “cell wall” – thick white mesh lines */
+      /* cube “cell wall” – single wireframe box (no meshline) */
       const h = 0.8;
-      const EDGE_WIDTH = 0.05;    // metres
-      const EDGE_COLOR = '#ffffff';
-      const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-                   [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-                   [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-                   [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-                   [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-                   [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
-      seg.forEach(p=>{
-        const s = p[0].join(' '), e = p[1].join(' ');
-        cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: true; worldUnits: true"></a-entity>`);
-      });
+      cell.insertAdjacentHTML('beforeend',
+        `<a-box depth="${2*h}" height="${2*h}" width="${2*h}"
+                position="0 0 0"
+                material="color:#ffffff; wireframe:true; wireframeLinewidth:3"></a-box>`);
 
       /* nucleus + membrane (bottom‑centre) */
       const nY = -0.55;
@@ -124,7 +115,6 @@
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
                   material="color:#cd853f;opacity:0.8"></a-box>`);
       });
-      /* (Blue mitochondria removed) */
     }
 
     /******** Cytoskeleton (random cyan filaments) ********/
@@ -141,27 +131,27 @@
     /******** Network generation ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* START NODE – bright yellow star billboard at top centre */
-      const startY = 0.9;   // place slightly above membrane so it's fully visible   // slightly beneath +h = 0.8
+      /* START NODE – bright yellow star at the very top */
+      const startY = 0.9; // sits above membrane
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
 
-      /* block around nucleus – avoid inside bottom nucleus */
+      /* avoid nucleus */
       const nC={x:0,y:-0.55,z:0}, nR=0.30;
 
-      /* fill the rest with random nodes */
+      /* random nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
-        const d=Math.sqrt((x-nC.x)**2 + (y-nC.y)**2 + (z-nC.z)**2);
-        if(d<nR) continue;            // skip if inside nucleus
+        const d=Math.hypot(x-nC.x, y-nC.y, z-nC.z);
+        if(d<nR) continue;
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
-      /* instantiate visuals */
+      /* visuals */
       nodes.forEach(n=>{
         if(n.type==='star'){
           cell.insertAdjacentHTML('beforeend',
             `<a-entity id="${n.id}"
-                      text="value: ★; color: #ffff00; align: center; anchor: center; baseline: center; side: double; shader: flat; width: 1.5"
+                      text="value: ★; color: #ffff00; shader: flat; align: center; anchor: center; baseline: center; width: 1.5"
                       position="${n.x} ${n.y} ${n.z}"
                       scale="1 1 1"></a-entity>`);
         }else{
@@ -171,13 +161,13 @@
         n.el=document.getElementById(n.id);
       });
 
-      /* connect each node to its three nearest neighbours (undirected) */
+      /* connect to 3 nearest neighbours */
       nodes.forEach((n,i)=>{
-        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x, n.y-m.y, n.z-m.z)}))
                          .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
-          const j=dists[k].j;if(j<i)continue; // avoid duplicate
+          const j=dists[k].j;if(j<i)continue;
           const id=`e${edges.length}`;
           const s=`${n.x} ${n.y} ${n.z}`;
           const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
@@ -189,22 +179,15 @@
       });
     }
 
-    /******** Colour‑reset / propagation helpers ********/
+    /******** Colour‑reset / propagation ********/
     function setNodeColour(node, col){
-      if(node.el.hasAttribute('text')){
-        node.el.setAttribute('text',`color:${col}`);
-      }else{
-        node.el.setAttribute('color',col);
-      }
+      if(node.type==='star') node.el.setAttribute('text',`color:${col}`);
+      else node.el.setAttribute('color',col);
     }
-    function resetColours(defaultCol){
-      nodes.forEach(n=>{
-        const col = n.type==='star' ? '#ffff00' : defaultCol;
-        setNodeColour(n,col);
-      });
-      edges.forEach(e=>e.el.setAttribute('line',`color:${defaultCol}`));
+    function resetColours(baseCol){
+      nodes.forEach(n=>setNodeColour(n, n.type==='star' ? '#ffff00' : baseCol));
+      edges.forEach(e=>e.el.setAttribute('line',`color:${baseCol}`));
     }
-
     function propagate(){
       timers.forEach(clearTimeout); timers=[];
       resetColours('#888');
@@ -214,53 +197,4 @@
         waves[waves.length-1].forEach(i=>{
           edges.forEach(e=>{
             const nb=e.a===i?e.b:e.b===i?e.a:null;
-            if(nb!==null && !visited.has(nb)){visited.add(nb);nxt.push(nb);}  
-          });
-        });
-        if(nxt.length) waves.push(nxt); else break;
-      }
-      waves.forEach((wave,w)=>{
-        timers.push(setTimeout(()=>{
-          wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
-          edges.forEach(e=>{
-            const ca=nodes[e.a].el.hasAttribute('text') ? nodes[e.a].el.getAttribute('text').color : nodes[e.a].el.getAttribute('color');
-            const cb=nodes[e.b].el.hasAttribute('text') ? nodes[e.b].el.getAttribute('text').color : nodes[e.b].el.getAttribute('color');
-            if(ca==="#ff0000" && cb==="#ff0000")
-              e.el.setAttribute('line','color:#ff0000');
-          });
-        },w*PROP_INTERVAL));
-      });
-    }
-    function resetNetwork(){timers.forEach(clearTimeout);timers=[];resetColours('#666');}
-
-    /******** Lifecycle ********/
-    scene.addEventListener('loaded',()=>{
-      loader.style.display='none';
-      addOrganelles();
-      addCytoskeleton();
-      buildNetwork();
-    });
-    marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      statusTxt.textContent='Success';
-      startBtn.style.display='block';
-    });
-    marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      statusTxt.textContent='Searching…';
-      startBtn.style.display='none';
-      resetNetwork();
-    });
-
-    startBtn.addEventListener('click', () => {
-      propagate();
-      startBtn.style.display = 'none';
-    });
-
-    resetBtn.addEventListener('click', () => {
-      resetNetwork();
-      propagate();
-    });
-  </script>
-</body>
-</html>
+            if(nb!==null && !visited.has(nb)){visited.add(nb);nxt.push(nb);}  });
