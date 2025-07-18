@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 150‑node network (star start)</title>
+  <title>Cubic cell – 150‑node network (visible star start)</title>
 
   <!-- A-Frame, AR.js and meshline -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -41,7 +41,7 @@
       <!-- doubled in size (scale 4) -->
       <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
     </a-marker>
-    <a-entity camera></a-entity>
+    <a-entity id="cam" camera></a-entity>
   </a-scene>
 
   <!-- drag‑rotate component -->
@@ -77,6 +77,7 @@
     const scene   = document.querySelector('a-scene');
     const marker  = document.getElementById('hiroMarker');
     const cell    = document.getElementById('cell');
+    const cameraEl= document.getElementById('cam');
     const statusTxt = document.getElementById('status');
     const loader  = document.getElementById('loader');
     const resetBtn= document.getElementById('resetBtn');
@@ -123,7 +124,7 @@
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
                   material="color:#cd853f;opacity:0.8"></a-box>`);
       });
-      /* (The two blue mitochondria were removed as requested) */
+      /* (Blue mitochondria removed) */
     }
 
     /******** Cytoskeleton (random cyan filaments) ********/
@@ -140,7 +141,7 @@
     /******** Network generation ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* START NODE – star at top centre (just inside membrane) */
+      /* START NODE – bright yellow star billboard at top centre */
       const startY = 0.78;   // slightly beneath +h = 0.8
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
 
@@ -159,8 +160,10 @@
       nodes.forEach(n=>{
         if(n.type==='star'){
           cell.insertAdjacentHTML('beforeend',
-            `<a-entity id="${n.id}" text="value:★; color:#888; align:center; baseline:center"
-                      position="${n.x} ${n.y} ${n.z}" scale="0.3 0.3 0.3"></a-entity>`);
+            `<a-entity id="${n.id}"
+                      text="value:★; color:#ffff00; align:center; anchor:center; baseline:center; side:double"
+                      position="${n.x} ${n.y} ${n.z}"
+                      scale="0.6 0.6 0.6" look-at="#cam"></a-entity>`);
         }else{
           cell.insertAdjacentHTML('beforeend',
             `<a-sphere id="${n.id}" radius="0.06" color="#888" position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
@@ -174,7 +177,7 @@
                          .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
-          const j=dists[k].j;if(j<i)continue;  // avoid double‑adding
+          const j=dists[k].j;if(j<i)continue; // avoid duplicate
           const id=`e${edges.length}`;
           const s=`${n.x} ${n.y} ${n.z}`;
           const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
@@ -194,15 +197,17 @@
         node.el.setAttribute('color',col);
       }
     }
-    function resetColours(col){
-      nodes.forEach(n=>setNodeColour(n,col));
-      edges.forEach(e=>e.el.setAttribute('line',`color:${col}`));
+    function resetColours(defaultCol){
+      nodes.forEach(n=>{
+        const col = n.type==='star' ? '#ffff00' : defaultCol;
+        setNodeColour(n,col);
+      });
+      edges.forEach(e=>e.el.setAttribute('line',`color:${defaultCol}`));
     }
 
     function propagate(){
       timers.forEach(clearTimeout); timers=[];
       resetColours('#888');
-      /* breadth‑first waves from node 0 */
       const visited=new Set([0]), waves=[[0]];
       while(waves[waves.length-1].length){
         const nxt=[];
@@ -214,7 +219,6 @@
         });
         if(nxt.length) waves.push(nxt); else break;
       }
-      /* colour by wave */
       waves.forEach((wave,w)=>{
         timers.push(setTimeout(()=>{
           wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
