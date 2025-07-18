@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 50-node network</title>
+  <title>Cubic cell – 50-node network (thick edges)</title>
 
   <!-- A-Frame, AR.js and meshline -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -65,8 +65,7 @@
         window.addEventListener('mouseup',()=>dragging=false);
         cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
         window.addEventListener('touchmove',e=>{
-          if(dragging){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},
-          {passive:false});
+          if(dragging){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5);} },{passive:false});
         window.addEventListener('touchend',()=>dragging=false);
       }
     });
@@ -74,39 +73,41 @@
 
   <script>
     /* handles & constants */
-    const scene=document.querySelector('a-scene');
-    const marker=document.getElementById('hiroMarker');
-    const cell=document.getElementById('cell');
-    const statusTxt=document.getElementById('status');
-    const loader=document.getElementById('loader');
-    const resetBtn=document.getElementById('resetBtn');
-    const startBtn=document.getElementById('startBtn');
+    const scene   = document.querySelector('a-scene');
+    const marker  = document.getElementById('hiroMarker');
+    const cell    = document.getElementById('cell');
+    const statusTxt = document.getElementById('status');
+    const loader  = document.getElementById('loader');
+    const resetBtn= document.getElementById('resetBtn');
+    const startBtn= document.getElementById('startBtn');
 
-    const N_NODES=50;
-    const PROP_INTERVAL=1200;
+    const N_NODES      = 50;
+    const PROP_INTERVAL= 1200;
 
     /* data stores */
-    const nodes=[], edges=[];
-    let timers=[];
+    const nodes = [], edges = [];
+    let timers  = [];
 
     /* ---------- static organelles ---------- */
     function addOrganelles(){
-      /* cube “cell wall” */
-      const h=0.8;
-      const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-                 [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-                 [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-                 [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-                 [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-                 [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
+      /* cube “cell wall” – THICK EDGES */
+      const h = 0.8;
+      const EDGE_WIDTH = 0.025;            // metres – tweak for thickness
+      const EDGE_COLOR = '#ffffff';        // bright so it stands out
+      const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+                   [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+                   [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+                   [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+                   [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+                   [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
       seg.forEach(p=>{
-        const s=p[0].join(' '), e=p[1].join(' ');
+        const s = p[0].join(' '), e = p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="path: ${s}, ${e}; color:#333333; lineWidth:0.5"></a-entity>`);
+          `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: false"></a-entity>`);
       });
 
       /* nucleus + membrane (bottom centre) */
-      const nY=-0.55;
+      const nY = -0.55;
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-sphere>
@@ -122,7 +123,7 @@
                   material="color:#cd853f;opacity:0.8"></a-box>`);
       });
 
-      /* mitochondria → replaced by small blue spheres */
+      /* mitochondria → small blue spheres */
       ["0.55 -0.33 0.25","0.48 0.40 -0.30"].forEach(pos=>{
         cell.insertAdjacentHTML('beforeend',
           `<a-sphere radius="0.10" position="${pos}"
@@ -192,7 +193,7 @@
         waves[waves.length-1].forEach(i=>{
           edges.forEach(e=>{
             const nb=e.a===i?e.b:e.b===i?e.a:null;
-            if(nb!==null && !visited.has(nb)){visited.add(nb);nxt.push(nb);}
+            if(nb!==null && !visited.has(nb)){visited.add(nb);nxt.push(nb);}  
           });
         });
         if(nxt.length) waves.push(nxt); else break;
