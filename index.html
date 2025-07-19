@@ -92,10 +92,11 @@
 
     /******** Static organelles (walls, nucleus, Golgi) ********/
     function addOrganelles(){
-      /* cube “cell wall” – thick white mesh lines */
+      /* cube “cell wall” – thick black mesh lines */
       const h = 0.8;
-      const EDGE_WIDTH = 0.05;    // metres
-      const EDGE_COLOR = '#ffffff';
+      const EDGE_WIDTH = 0.08;    // metres (slightly thicker for visibility)
+      const EDGE_COLOR = '#000000';  // << black edges >>
+
       const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
                    [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
                    [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
@@ -142,7 +143,7 @@
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
       /* START NODE – bright yellow star billboard at top centre */
-      const startY = 0.9;   // place slightly above membrane so it's fully visible   // slightly beneath +h = 0.8
+      const startY = 0.9;   // place slightly above membrane so it's fully visible
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
 
       /* block around nucleus – avoid inside bottom nucleus */
