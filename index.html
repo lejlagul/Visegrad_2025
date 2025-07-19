@@ -83,8 +83,8 @@
     const resetBtn= document.getElementById('resetBtn');
     const startBtn= document.getElementById('startBtn');
 
-    const N_NODES       = 150;   // total (including the star)
-    const PROP_INTERVAL = 1200;  // ms between propagation waves
+    const N_NODES       = 100;   // total (including the star)
+    const PROP_INTERVAL = 1500;  // ms between propagation waves
 
     /* data stores */
     const nodes = [], edges = [];
@@ -94,7 +94,7 @@
     function addOrganelles(){
       /* cube “cell wall” – thick black mesh lines */
       const h = 0.8;
-      const EDGE_WIDTH = 0.08;    // metres (slightly thicker for visibility)
+      const EDGE_WIDTH = 8.0;    // metres (slightly thicker for visibility)
       const EDGE_COLOR = '#000000';  // << black edges >>
 
       const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
