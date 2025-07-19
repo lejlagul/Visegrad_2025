@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – cylinders everywhere, thinner links</title>
+  <title>Cubic cell – two propagation modes</title>
 
   <!-- A‑Frame & AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -12,14 +12,19 @@
   <style>
     body{margin:0;overflow:hidden;font-family:monospace}
     #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
-    #resetBtn,#startBtn,#zoomInBtn,#zoomOutBtn{
-      position:fixed;padding:6px 12px;font:16px monospace;
-      background:#222;color:#fff;border:1px solid #888;border-radius:4px;
-      opacity:0.85;z-index:1000}
-    #resetBtn{bottom:12px;left:12px}
-    #startBtn{bottom:12px;right:12px;display:none}
-    #zoomInBtn,#zoomOutBtn{bottom:12px}
-    #zoomInBtn{left:calc(50% - 34px)} #zoomOutBtn{left:calc(50% + 2px)}
+
+    /* buttons */
+    .btn{position:fixed;padding:6px 12px;font:16px monospace;
+         background:#222;color:#fff;border:1px solid #888;border-radius:4px;
+         opacity:0.85;z-index:1000}
+
+    #resetBtn   {bottom:12px;left:12px}
+    #pathBtn    {bottom:12px;right:12px;display:none}
+    #diffuseBtn {bottom:56px;right:12px;display:none}  /* 44px above the other */
+    #zoomInBtn  {bottom:12px;left:calc(50% - 34px)}
+    #zoomOutBtn {bottom:12px;left:calc(50% + 2px)}
+
+    /* loader */
     #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
             align-items:center;background:#000}
     .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
@@ -29,15 +34,17 @@
 </head>
 
 <body>
-  <div id="loader"><div class="spinner"></div>
+  <div id="loader">
+    <div class="spinner"></div>
     <p style="color:#fff;margin-top:12px">Loading camera…</p>
   </div>
 
   <div id="status">Searching…</div>
-  <button id="resetBtn">Reset signal</button>
-  <button id="startBtn">Start animation</button>
-  <button id="zoomInBtn">＋</button>
-  <button id="zoomOutBtn">－</button>
+  <button id="resetBtn"  class="btn">Reset</button>
+  <button id="pathBtn"   class="btn">Path&nbsp;propagation</button>
+  <button id="diffuseBtn" class="btn">Full&nbsp;diffusion</button>
+  <button id="zoomInBtn" class="btn">＋</button>
+  <button id="zoomOutBtn" class="btn">－</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
@@ -46,7 +53,7 @@
     <a-entity id="cam" camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate -->
+  <!-- drag‑rotate component -->
   <script>
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
@@ -81,14 +88,14 @@
           statusTxt=document.getElementById('status'),
           loader=document.getElementById('loader'),
           resetBtn=document.getElementById('resetBtn'),
-          startBtn=document.getElementById('startBtn'),
+          pathBtn=document.getElementById('pathBtn'),
+          diffuseBtn=document.getElementById('diffuseBtn'),
           zoomInBtn=document.getElementById('zoomInBtn'),
           zoomOutBtn=document.getElementById('zoomOutBtn');
 
     const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
-          SCALE_MIN=1, SCALE_MAX=10,
-          NETWORK_RADIUS=0.006,   // << thinner links
-          CUBE_RADIUS   =0.02;    // cube frame a bit bolder
+          NETWORK_RADIUS=0.006, CUBE_RADIUS=0.02,
+          SCALE_MIN=1, SCALE_MAX=10;
     let currentScale=4;
 
     const nodes=[],edges=[],endpointIdx=[],timers=[];
@@ -122,15 +129,15 @@
                     radius="${radius}" height="${len}" color="${color}"
                     material="opacity:0.9;shader:flat"></a-cylinder>`);
       const cyl=document.getElementById(id);
-      const dir=bVec.clone().sub(aVec).normalize();
-      const up=new THREE.Vector3(0,1,0);
-      cyl.object3D.quaternion.setFromUnitVectors(up,dir);
+      cyl.object3D.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0,1,0),
+        bVec.clone().sub(aVec).normalize()
+      );
       return cyl;
     }
 
-    /******** Static organelles – nucleus + cube frame ********/
+    /******** Cube frame & nucleus ********/
     function addOrganelles(){
-      /* cube edges as cylinders */
       const h=0.8;
       const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
                  [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
@@ -139,12 +146,9 @@
                  [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
                  [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
       seg.forEach(p=>{
-        const a=new THREE.Vector3(...p[0]);
-        const b=new THREE.Vector3(...p[1]);
-        addCylinder(a,b,CUBE_RADIUS,'#000',cell);
+        addCylinder(new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),
+                    CUBE_RADIUS,'#000',cell);
       });
-
-      /* nucleus only (Golgi removed) */
       const nY=-0.55;
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
@@ -153,16 +157,14 @@
                   material="color:#dda0dd;opacity:0.25;transparent:true;side:double"></a-sphere>`);
     }
 
-    /******** Network generation (cylinder links) ********/
+    /******** Network generation ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* blue start */
-      const startY=0.9;
-      nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
-      /* nucleus params */
-      const nC={x:0,y:-0.55,z:0}, nR=0.30;
+      /* blue start node */
+      nodes.push({id:'n0',x:0,y:0.9,z:0,type:'star'});
 
       /* endpoints inside nucleus */
+      const nC={x:0,y:-0.55,z:0}, nR=0.30;
       while(endpointIdx.length<N_ENDPOINTS){
         let x,y,z;
         do{
@@ -191,16 +193,17 @@
         n.el=document.getElementById(n.id);
       });
 
-      /* cylinder edges */
+      /* cylinder edges (3 nearest) */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
                          .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
           const j=dists[k].j;if(j<i)continue;
-          const a=new THREE.Vector3(n.x,n.y,n.z);
-          const b=new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z);
-          const cyl=addCylinder(a,b,NETWORK_RADIUS,'#666',cell);
+          const cyl=addCylinder(
+            new THREE.Vector3(n.x,n.y,n.z),
+            new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
+            NETWORK_RADIUS,'#666',cell);
           edges.push({a:i,b:j,el:cyl});
           added++;
         }
@@ -216,13 +219,13 @@
       });
       edges.forEach(e=>e.el.setAttribute('color',base));
     }
+    function resetNetwork(){timers.forEach(clearTimeout);timers.length=0;resetColours('#666');}
 
-    /******** Path‑limited propagation (unchanged logic) ********/
-    function propagate(){
+    /******** Path‑limited propagation (existing logic extracted) ********/
+    function propagatePaths(){
       timers.forEach(clearTimeout);timers.length=0;
       resetColours('#888');
 
-      /* adjacency */
       const adj=Array(nodes.length).fill().map(()=>[]);
       const edgeMap=new Map();
       edges.forEach((e,i)=>{
@@ -230,7 +233,6 @@
         edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);
       });
 
-      /* BFS */
       const start=0,prev=Array(nodes.length).fill(-1),dist=Array(nodes.length).fill(Infinity);
       const q=[start];dist[start]=0;let found=0;
       while(q.length&&found<endpointIdx.length){
@@ -242,7 +244,7 @@
         });
       }
 
-      /* collect paths */
+      /* union of paths */
       const pathNodes=new Set([start]),pathEdges=new Set();
       endpointIdx.forEach(ep=>{
         let u=ep;
@@ -254,9 +256,8 @@
         }
       });
 
-      /* distance along path graph */
-      const pathDist={},toVisit=[start];pathNodes.forEach(i=>pathDist[i]=Infinity);
-      pathDist[start]=0;
+      /* distance along union */
+      const pathDist={},toVisit=[start];pathNodes.forEach(i=>pathDist[i]=Infinity);pathDist[start]=0;
       while(toVisit.length){
         const u=toVisit.shift();
         adj[u].forEach(v=>{
@@ -268,7 +269,6 @@
       }
       const maxStep=Math.max(...Object.values(pathDist));
 
-      /* animate */
       for(let s=0;s<=maxStep;s++){
         timers.push(setTimeout(()=>{
           Object.entries(pathDist).forEach(([i,d])=>{
@@ -282,27 +282,60 @@
         },s*PROP_INTERVAL));
       }
     }
-    const resetNetwork=()=>{timers.forEach(clearTimeout);timers.length=0;resetColours('#666');};
 
-    /******** Lifecycle ********/
+    /******** Full diffusion (flood) ********/
+    function propagateDiffuse(){
+      timers.forEach(clearTimeout);timers.length=0;
+      resetColours('#888');
+
+      const visited=new Set([0]),waves=[[0]];
+      while(waves[waves.length-1].length){
+        const next=[];
+        waves[waves.length-1].forEach(i=>{
+          edges.forEach(e=>{
+            const nb=e.a===i?e.b:e.b===i?e.a:null;
+            if(nb!==null&&!visited.has(nb)){visited.add(nb);next.push(nb);}
+          });
+        });
+        if(next.length)waves.push(next);else break;
+      }
+      waves.forEach((wave,w)=>{
+        timers.push(setTimeout(()=>{
+          wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
+          edges.forEach(e=>{
+            const ca=nodes[e.a].el.getAttribute('color');
+            const cb=nodes[e.b].el.getAttribute('color');
+            if(ca==='#ff0000'&&cb==='#ff0000')
+              e.el.setAttribute('color','#ff0000');
+          });
+        },w*PROP_INTERVAL));
+      });
+    }
+
+    /******** Lifecycle & button wiring ********/
     scene.addEventListener('loaded',()=>{
       loader.style.display='none';
-      addOrganelles();               // cube frame + nucleus
-      buildNetwork();                // nodes + network edges
+      addOrganelles();
+      buildNetwork();
     });
+
     marker.addEventListener('markerFound',()=>{
       cell.setAttribute('visible',true);
       statusTxt.textContent='Success';
-      startBtn.style.display='block';
+      pathBtn.style.display='block';
+      diffuseBtn.style.display='block';
     });
     marker.addEventListener('markerLost',()=>{
       cell.setAttribute('visible',false);
       statusTxt.textContent='Searching…';
-      startBtn.style.display='none';
+      pathBtn.style.display='none';
+      diffuseBtn.style.display='none';
       resetNetwork();
     });
-    startBtn.onclick =()=>{propagate();startBtn.style.display='none';};
-    resetBtn.onclick =()=>{resetNetwork();propagate();};
+
+    pathBtn.onclick    =()=>{propagatePaths();};
+    diffuseBtn.onclick =()=>{propagateDiffuse();};
+    resetBtn.onclick   =()=>{resetNetwork();};
   </script>
 </body>
 </html>
