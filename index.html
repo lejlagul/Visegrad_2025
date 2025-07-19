@@ -2,31 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – spaced nodes</title>
+  <title>Cubic cell – spaced nodes + cylinder edges</title>
 
-  <!-- A‑Frame, AR.js and meshline -->
+  <!-- A‑Frame & AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
+  <!-- meshline still loaded for the cube frame; harmless to keep -->
   <script src="https://raw.githack.com/spite/aframe-meshline-component/master/dist/aframe-meshline-component.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body{margin:0;overflow:hidden;font-family:monospace}
-
     #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
-
     #resetBtn,#startBtn,#zoomInBtn,#zoomOutBtn{
       position:fixed;padding:6px 12px;font:16px monospace;
       background:#222;color:#fff;border:1px solid #888;border-radius:4px;
       opacity:0.85;z-index:1000}
-
     #resetBtn{bottom:12px;left:12px}
     #startBtn{bottom:12px;right:12px;display:none}
-
     #zoomInBtn,#zoomOutBtn{bottom:12px}
-    #zoomInBtn{left:calc(50% - 34px)}
-    #zoomOutBtn{left:calc(50% + 2px)}
-
+    #zoomInBtn{left:calc(50% - 34px)} #zoomOutBtn{left:calc(50% + 2px)}
     #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
             align-items:center;background:#000}
     .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
@@ -36,8 +31,7 @@
 </head>
 
 <body>
-  <div id="loader">
-    <div class="spinner"></div>
+  <div id="loader"><div class="spinner"></div>
     <p style="color:#fff;margin-top:12px">Loading camera…</p>
   </div>
 
@@ -54,9 +48,9 @@
     <a-entity id="cam" camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate (unchanged) -->
+  <!-- drag‑rotate – unchanged -->
   <script>
-    AFRAME.registerComponent('drag-rotate', {
+    AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
       init(){
         const cvs=this.el.sceneEl.canvas;
@@ -78,8 +72,7 @@
         window.addEventListener('touchmove',e=>{
           if(dragging){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},{passive:false});
         window.addEventListener('touchend',()=>dragging=false);
-      }
-    });
+      }});
   </script>
 
   <script>
@@ -94,11 +87,8 @@
           zoomInBtn=document.getElementById('zoomInBtn'),
           zoomOutBtn=document.getElementById('zoomOutBtn');
 
-    const N_NODES=150,
-          N_ENDPOINTS=4,
-          PROP_INTERVAL=900,
-          SCALE_MIN=1,
-          SCALE_MAX=10;
+    const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
+          SCALE_MIN=1, SCALE_MAX=10;
     let currentScale=4;
 
     const nodes=[],edges=[],endpointIdx=[],timers=[];
@@ -114,8 +104,7 @@
     let pinchStart=null;
     window.addEventListener('touchmove',e=>{
       if(e.touches.length===2){
-        const [a,b]=e.touches,
-              d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+        const [a,b]=e.touches,d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
         if(pinchStart===null) pinchStart=d;
         else{setCellScale(currentScale*(d/pinchStart));pinchStart=d;}
         e.preventDefault();
@@ -146,8 +135,7 @@
         cell.insertAdjacentHTML('beforeend',
           `<a-box width="${w}" height="0.05" depth="${(w*0.58).toFixed(3)}"
                   position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
-                  material="color:#cd853f;opacity:0.8"></a-box>`);
-      });
+                  material="color:#cd853f;opacity:0.8"></a-box>`);});
     }
 
     /******** Cytoskeleton (unchanged) ********/
@@ -157,11 +145,10 @@
         const a=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)],
               b=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)];
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start:${a.join(' ')};end:${b.join(' ')};color:#00ffff;transparent:true;opacity:0.3"></a-entity>`);
-      }
+          `<a-entity line="start:${a.join(' ')};end:${b.join(' ')};color:#00ffff;transparent:true;opacity:0.3"></a-entity>`);}
     }
 
-    /******** Network generation (node radii reduced) ********/
+    /******** Network generation – cylinder edges ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
       /* blue start node */
@@ -190,52 +177,60 @@
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
-      /* visuals with new radii */
+      /* visuals */
       nodes.forEach(n=>{
-        if(n.type==='star'){
-          cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.06" color="#0000ff"
-                       position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
-        }else if(n.type==='endpoint'){
-          cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.06" color="#00ff00"
-                       position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
-        }else{
-          cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.04" color="#888"
-                       position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
-        }
+        const rad = n.type==='sphere'?0.04:0.06;
+        const col = n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#888';
+        cell.insertAdjacentHTML('beforeend',
+          `<a-sphere id="${n.id}" radius="${rad}" color="${col}"
+                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         n.el=document.getElementById(n.id);
       });
 
-      /* edges */
+      /* cylinder edges */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)})).sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
           const j=dists[k].j;if(j<i)continue;
+
+          const p1=new THREE.Vector3(n.x,n.y,n.z);
+          const p2=new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z);
+          const mid=p1.clone().add(p2).multiplyScalar(0.5);
+          const len=p1.distanceTo(p2);
+
           const id=`e${edges.length}`;
-          cell.insertAdjacentHTML('beforeend',
-            `<a-entity id="${id}" line="start:${n.x} ${n.y} ${n.z};end:${nodes[j].x} ${nodes[j].y} ${nodes[j].z};color:#666"></a-entity>`);
-          edges.push({id,a:i,b:j,el:document.getElementById(id)});
+          cell.insertAdjacentHTML('beforeend',`
+            <a-cylinder id="${id}"
+                        position="${mid.x} ${mid.y} ${mid.z}"
+                        radius="0.01" height="${len}"
+                        color="#666" material="opacity:0.8;shader:flat"></a-cylinder>`);
+          const cyl=document.getElementById(id);
+          /* orient cylinder so its Y‑axis points p1→p2 */
+          const dir=p2.clone().sub(p1).normalize();
+          const up=new THREE.Vector3(0,1,0);
+          const quat=new THREE.Quaternion().setFromUnitVectors(up,dir);
+          cyl.object3D.quaternion.copy(quat);
+
+          edges.push({id,a:i,b:j,el:cyl});
           added++;
         }
       });
     }
 
-    /******** Colour helpers (unchanged) ********/
-    function setNodeColour(node,col){node.el.setAttribute('color',col);}
+    /******** Colour helpers ********/
+    function setNodeColour(n,c){ n.el.setAttribute('color',c); }
     function resetColours(base='#666'){
       nodes.forEach(n=>{
-        let col=base;
-        if(n.type==='star') col='#0000ff';
-        else if(n.type==='endpoint') col='#00ff00';
-        setNodeColour(n,col);
+        let c=base;
+        if(n.type==='star') c='#0000ff';
+        else if(n.type==='endpoint') c='#00ff00';
+        setNodeColour(n,c);
       });
-      edges.forEach(e=>e.el.setAttribute('line',`color:${base}`));
+      edges.forEach(e=>e.el.setAttribute('color',base));
     }
 
-    /******** Path‑limited propagation (unchanged) ********/
+    /******** Path‑limited propagation (edge colour uses .color) ********/
     function propagate(){
       timers.forEach(clearTimeout);timers.length=0;
       resetColours('#888');
@@ -254,8 +249,7 @@
         adj[u].forEach(v=>{
           if(dist[v]!==Infinity)return;
           prev[v]=u;dist[v]=dist[u]+1;q.push(v);
-          if(endpointIdx.includes(v))found++;
-        });
+          if(endpointIdx.includes(v))found++;});
       }
 
       const pathNodes=new Set([start]),pathEdges=new Set();
@@ -289,7 +283,7 @@
           pathEdges.forEach(ei=>{
             const e=edges[ei];
             if(pathDist[e.a]<=s&&pathDist[e.b]<=s)
-              e.el.setAttribute('line','color:#ff0000');
+              e.el.setAttribute('color','#ff0000');
           });
         },s*PROP_INTERVAL));
       }
