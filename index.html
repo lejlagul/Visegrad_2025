@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – nucleus end‑points</title>
+  <title>Cubic cell – spaced nodes</title>
 
   <!-- A‑Frame, AR.js and meshline -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -23,7 +23,6 @@
     #resetBtn{bottom:12px;left:12px}
     #startBtn{bottom:12px;right:12px;display:none}
 
-    /* zoom buttons */
     #zoomInBtn,#zoomOutBtn{bottom:12px}
     #zoomInBtn{left:calc(50% - 34px)}
     #zoomOutBtn{left:calc(50% + 2px)}
@@ -95,8 +94,8 @@
           zoomInBtn=document.getElementById('zoomInBtn'),
           zoomOutBtn=document.getElementById('zoomOutBtn');
 
-    const N_NODES=150,          // total
-          N_ENDPOINTS=4,         // inside nucleus
+    const N_NODES=150,
+          N_ENDPOINTS=4,
           PROP_INTERVAL=900,
           SCALE_MIN=1,
           SCALE_MAX=10;
@@ -111,22 +110,20 @@
     }
     zoomInBtn.onclick =()=>setCellScale(currentScale*1.2);
     zoomOutBtn.onclick=()=>setCellScale(currentScale/1.2);
-    window.addEventListener('wheel',e=>{
-      setCellScale(currentScale*(e.deltaY<0?1.1:0.9));
-    },{passive:true});
+    window.addEventListener('wheel',e=>setCellScale(currentScale*(e.deltaY<0?1.1:0.9)),{passive:true});
     let pinchStart=null;
     window.addEventListener('touchmove',e=>{
       if(e.touches.length===2){
-        const [a,b]=e.touches;
-        const d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+        const [a,b]=e.touches,
+              d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
         if(pinchStart===null) pinchStart=d;
-        else{setCellScale(currentScale*(d/pinchStart)); pinchStart=d;}
+        else{setCellScale(currentScale*(d/pinchStart));pinchStart=d;}
         e.preventDefault();
       }
     },{passive:false});
     window.addEventListener('touchend',()=>pinchStart=null);
 
-    /******** Static organelles ********/
+    /******** Static organelles (unchanged) ********/
     function addOrganelles(){
       const h=0.8, EDGE_WIDTH=0.08, EDGE_COLOR='#000';
       const seg=[[[-h,-h,-h],[-h, h,-h]],[[ h,-h,-h],[ h, h,-h]],
@@ -153,7 +150,7 @@
       });
     }
 
-    /******** Cytoskeleton ********/
+    /******** Cytoskeleton (unchanged) ********/
     function addCytoskeleton(){
       const rnd=(a,b)=>Math.random()*(b-a)+a;
       for(let i=0;i<90;i++){
@@ -164,54 +161,54 @@
       }
     }
 
-    /******** Network generation ********/
+    /******** Network generation (node radii reduced) ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* ----- START NODE (blue sphere) ----- */
+      /* blue start node */
       const startY=0.9;
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
 
-      /* nucleus centre & radius */
+      /* nucleus params */
       const nC={x:0,y:-0.55,z:0}, nR=0.30;
 
-      /* ----- green end‑points *inside* nucleus ----- */
-      for(let k=0;k<N_ENDPOINTS;k++){
+      /* green endpoints inside nucleus */
+      while(endpointIdx.length<N_ENDPOINTS){
         let x,y,z;
         do{
           x=rnd(-nR*0.9,nR*0.9);
-          y=rnd(-nR*0.9,nR*0.9)+nC.y;     // shift down to nucleus centre
+          y=rnd(-nR*0.9,nR*0.9)+nC.y;
           z=rnd(-nR*0.9,nR*0.9);
         }while(Math.hypot(x-nC.x,y-nC.y,z-nC.z)>nR*0.9);
         endpointIdx.push(nodes.length);
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'endpoint'});
       }
 
-      /* ----- rest of nodes outside nucleus ----- */
+      /* rest of nodes */
       while(nodes.length<N_NODES){
-        const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
+        const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
         if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<nR) continue;
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
-      /* ----- visuals ----- */
+      /* visuals with new radii */
       nodes.forEach(n=>{
-        if(n.type==='star'){   /* blue sphere */
+        if(n.type==='star'){
           cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.08" color="#0000ff"
+            `<a-sphere id="${n.id}" radius="0.06" color="#0000ff"
                        position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         }else if(n.type==='endpoint'){
           cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.08" color="#00ff00"
+            `<a-sphere id="${n.id}" radius="0.06" color="#00ff00"
                        position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         }else{
           cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.06" color="#888"
+            `<a-sphere id="${n.id}" radius="0.04" color="#888"
                        position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         }
         n.el=document.getElementById(n.id);
       });
 
-      /* ----- edges (3 nearest) ----- */
+      /* edges */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)})).sort((a,b)=>a.dist-b.dist);
         let added=0;
@@ -226,26 +223,23 @@
       });
     }
 
-    /******** Colour helpers ********/
-    function setNodeColour(node,col){
-      node.el.setAttribute('color',col);
-    }
+    /******** Colour helpers (unchanged) ********/
+    function setNodeColour(node,col){node.el.setAttribute('color',col);}
     function resetColours(base='#666'){
       nodes.forEach(n=>{
         let col=base;
-        if(n.type==='star')      col='#0000ff';
+        if(n.type==='star') col='#0000ff';
         else if(n.type==='endpoint') col='#00ff00';
         setNodeColour(n,col);
       });
       edges.forEach(e=>e.el.setAttribute('line',`color:${base}`));
     }
 
-    /******** Path‑limited propagation (unchanged logic) ********/
+    /******** Path‑limited propagation (unchanged) ********/
     function propagate(){
       timers.forEach(clearTimeout);timers.length=0;
       resetColours('#888');
 
-      /* adjacency + map */
       const adj=Array(nodes.length).fill().map(()=>[]);
       const edgeMap=new Map();
       edges.forEach((e,i)=>{
@@ -253,52 +247,48 @@
         edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);
       });
 
-      /* BFS from star to endpoints */
-      const start=0, prev=new Array(nodes.length).fill(-1), dist=new Array(nodes.length).fill(Infinity);
-      const q=[start]; dist[start]=0; let found=0;
-      while(q.length && found<endpointIdx.length){
+      const start=0,prev=new Array(nodes.length).fill(-1),dist=new Array(nodes.length).fill(Infinity);
+      const q=[start];dist[start]=0;let found=0;
+      while(q.length&&found<endpointIdx.length){
         const u=q.shift();
         adj[u].forEach(v=>{
           if(dist[v]!==Infinity)return;
-          prev[v]=u; dist[v]=dist[u]+1; q.push(v);
-          if(endpointIdx.includes(v)) found++;
+          prev[v]=u;dist[v]=dist[u]+1;q.push(v);
+          if(endpointIdx.includes(v))found++;
         });
       }
 
-      /* collect nodes/edges on all shortest paths */
-      const pathNodes=new Set([start]), pathEdges=new Set();
+      const pathNodes=new Set([start]),pathEdges=new Set();
       endpointIdx.forEach(ep=>{
         let u=ep;
-        while(u!==start && u!==-1){
+        while(u!==start&&u!==-1){
           pathNodes.add(u);
-          const p=prev[u], key=`${Math.min(u,p)}-${Math.max(u,p)}`;
-          if(edgeMap.has(key)) pathEdges.add(edgeMap.get(key));
+          const p=prev[u],key=`${Math.min(u,p)}-${Math.max(u,p)}`;
+          if(edgeMap.has(key))pathEdges.add(edgeMap.get(key));
           u=p;
         }
       });
 
-      /* distance within path graph */
-      const pathDist={},toVisit=[start]; pathNodes.forEach(i=>pathDist[i]=Infinity); pathDist[start]=0;
+      const pathDist={},toVisit=[start];pathNodes.forEach(i=>pathDist[i]=Infinity);pathDist[start]=0;
       while(toVisit.length){
         const u=toVisit.shift();
         adj[u].forEach(v=>{
-          if(!pathNodes.has(v)||pathDist[v]!==Infinity) return;
+          if(!pathNodes.has(v)||pathDist[v]!==Infinity)return;
           if(pathEdges.has(edgeMap.get(`${Math.min(u,v)}-${Math.max(u,v)}`))){
-            pathDist[v]=pathDist[u]+1; toVisit.push(v);
+            pathDist[v]=pathDist[u]+1;toVisit.push(v);
           }
         });
       }
       const maxStep=Math.max(...Object.values(pathDist));
 
-      /* animate */
       for(let s=0;s<=maxStep;s++){
         timers.push(setTimeout(()=>{
           Object.entries(pathDist).forEach(([i,d])=>{
-            if(d===s) setNodeColour(nodes[i],'#ff0000');
+            if(d===s)setNodeColour(nodes[i],'#ff0000');
           });
           pathEdges.forEach(ei=>{
             const e=edges[ei];
-            if(pathDist[e.a]<=s && pathDist[e.b]<=s)
+            if(pathDist[e.a]<=s&&pathDist[e.b]<=s)
               e.el.setAttribute('line','color:#ff0000');
           });
         },s*PROP_INTERVAL));
