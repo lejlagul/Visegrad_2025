@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – microbe‑host PPI demo</title>
+  <title>Cubic cell – microbe‑host PPI demo (Modified)</title>
 
-  <!-- A‑Frame & AR.js -->
-  <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -13,8 +12,8 @@
     body{margin:0;overflow:hidden;font-family:monospace}
     #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
     .btn{position:fixed;padding:6px 12px;font:16px monospace;
-         background:#222;color:#fff;border:1px solid #888;border-radius:4px;
-         opacity:0.85;z-index:1000}
+        background:#222;color:#fff;border:1px solid #888;border-radius:4px;
+        opacity:0.85;z-index:1000}
     #resetBtn   {bottom:12px;left:12px}
     #pathBtn    {bottom:12px;right:12px;display:none}
     #diffuseBtn {bottom:56px;right:12px;display:none}
@@ -42,17 +41,14 @@
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <!-- host cell -->
       <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
 
-      <!-- extracellular bacterium (green rod) -->
       <a-cylinder id="bacterium" radius="0.12" height="0.36"
-                  color="#35c94a" position="0 2.2 0" rotation="90 0 0"></a-cylinder>
+                  color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>
     </a-marker>
     <a-entity camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate component -->
   <script>
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
@@ -124,10 +120,11 @@
       const mid=aVec.clone().add(bVec).multiplyScalar(0.5);
       const len=aVec.distanceTo(bVec);
       const id=`cyl-${Math.random().toString(36).slice(2)}`;
+      // MODIFICATION: Changed opacity of cylinders to 0.7 for transparency
       parent.insertAdjacentHTML('beforeend',`
         <a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
                     radius="${radius}" height="${len}" color="${color}"
-                    material="opacity:0.9;shader:flat"></a-cylinder>`);
+                    material="opacity:0.7;shader:flat"></a-cylinder>`);
       document.getElementById(id).object3D.quaternion.setFromUnitVectors(
         new THREE.Vector3(0,1,0),
         bVec.clone().sub(aVec).normalize()
@@ -135,7 +132,7 @@
       return id;
     }
 
-    /* === cube frame & yellow nucleus === */
+    /* === cube frame & orange nucleus with DNA === */
     function addOrganelles(){
       const h=0.8, frame=[
         [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
@@ -144,15 +141,20 @@
         [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
         [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
         [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
+      // MODIFICATION: Cube frame color is now dark grey '#444444'
       frame.forEach(p=>addCylinder(
-        new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),CUBE_RADIUS,'#000',cell));
+        new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),CUBE_RADIUS,'#444444',cell));
 
       const nY=-0.55;
+      // MODIFICATION: Nucleus is now orange and contains a DNA model
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
-                  material="color:#ffff00;opacity:0.45;transparent:true;side:double"></a-sphere>
+                  material="color:#FFA500;opacity:0.4;transparent:true;side:double"></a-sphere>
         <a-sphere radius="0.28" position="0 ${nY} 0"
-                  material="color:#ffffaa;opacity:0.15;transparent:true;side:double"></a-sphere>`);
+                  material="color:#FFDAB9;opacity:0.15;transparent:true;side:double"></a-sphere>
+        <a-gltf-model src="https://cdn.glitch.global/60126742-7663-452f-915f-363e77f525ab/dna_molecule.glb?v=1680012945899"
+                      scale="0.1 0.1 0.1" position="0 ${nY} 0" rotation="0 45 0"></a-gltf-model>
+      `);
     }
 
     /* === network generation === */
@@ -166,33 +168,35 @@
       /* blue start node */
       nodes.push({id:'n0',x:0,y:0.9,z:0,type:'star'});
 
-      /* endpoints in nucleus */
-      const nC={x:0,y:-0.55,z:0}, nR=0.30;
-      while(endpointIdx.length<N_ENDPOINTS){
-        let x,y,z;
-        do{
-          x=rnd(-nR*0.9,nR*0.9);
-          y=rnd(-nR*0.9,nR*0.9)+nC.y;
-          z=rnd(-nR*0.9,nR*0.9);
-        }while(Math.hypot(x-nC.x,y-nC.y,z-nC.z)>nR*0.9);
+      // MODIFICATION: Gene target points are now placed on the DNA helix
+      const nC = { x: 0, y: -0.55, z: 0 };
+      const dnaRadius = 0.15; // Radius of the helix
+      const dnaHeight = 0.5;  // Height of the helix section
+      for (let i = 0; i < N_ENDPOINTS; i++) {
+        const angle = (i / (N_ENDPOINTS -1)) * Math.PI * 3; // 1.5 twists
+        const y_offset = (i / (N_ENDPOINTS - 1)) * dnaHeight - (dnaHeight / 2);
+        const x = dnaRadius * Math.cos(angle);
+        const y = y_offset + nC.y;
+        const z = dnaRadius * Math.sin(angle);
         endpointIdx.push(nodes.length);
-        nodes.push({id:`n${nodes.length}`,x,y,z,type:'endpoint'});
+        nodes.push({id:`n${nodes.length}`, x, y, z, type:'endpoint'});
       }
 
       /* remaining nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
-        if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<nR) continue;
+        if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<0.3) continue; // Keep nodes out of nucleus
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
       /* node visuals */
       nodes.forEach(n=>{
         const r=n.type==='sphere'?0.04:0.06;
-        const c=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#888';
+        // MODIFICATION: Lighter grey color for regular nodes
+        const c=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#BBBBBB';
         cell.insertAdjacentHTML('beforeend',
           `<a-sphere id="${n.id}" radius="${r}" color="${c}"
-                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+                   position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         n.el=document.getElementById(n.id);
       });
 
@@ -203,10 +207,11 @@
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
           const j=dists[k].j;if(j<i)continue;
+          // MODIFICATION: Lighter grey for edges
           addCylinder(
             new THREE.Vector3(n.x,n.y,n.z),
             new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
-            NETWORK_RADIUS,'#666',cell);
+            NETWORK_RADIUS,'#AAAAAA',cell);
           edges.push({a:i,b:j,el:cell.lastElementChild});
           added++;
         }
@@ -215,14 +220,14 @@
 
     /* === colour helpers === */
     function setNodeColour(n,c){ n.el.setAttribute('color',c); }
-    function resetColours(base='#666'){
+    function resetColours(base='#AAAAAA'){ // MODIFICATION: Lighter base grey
       nodes.forEach(n=>{
         let c=base;if(n.type==='star')c='#0000ff';else if(n.type==='endpoint')c='#00ff00';
         setNodeColour(n,c);
       });
       edges.forEach(e=>e.el.setAttribute('color',base));
     }
-    function resetNetwork(){timers.forEach(clearTimeout);timers.length=0;resetColours('#666');}
+    function resetNetwork(){timers.forEach(clearTimeout);timers.length=0;resetColours();}
 
     /* === path‑limited propagation === */
     function propagatePaths(){
@@ -308,11 +313,12 @@
     /* === bacterium secretion === */
     function secreteProtein(){
       const id=`prot-${secretedCount++}`;
-      const startY=2.2,endY=0.9;
+      const startY=1.0, endY=0.9; // MODIFICATION: Adjusted start height for new bacterium position
+      const startX=1.2, endX=0;
       cell.insertAdjacentHTML('beforeend',`
-        <a-sphere id="${id}" radius="0.04" color="#ff00ff" position="0 ${startY} 0"
-                  animation="property: position; to: 0 ${endY} 0; dur: 2500;
-                             easing: linear; fill: forwards"></a-sphere>`);
+        <a-sphere id="${id}" radius="0.04" color="#ff00ff" position="${startX} ${startY} 0"
+                  animation="property: position; to: ${endX} ${endY} 0; dur: 2500;
+                           easing: linear; fill: forwards"></a-sphere>`);
     }
 
     /* === lifecycle === */
@@ -333,7 +339,7 @@
     });
 
     /* button actions */
-    pathBtn.onclick    =()=>propagatePaths();
+    pathBtn.onclick   =()=>propagatePaths();
     diffuseBtn.onclick =()=>propagateDiffuse();
     secreteBtn.onclick =()=>secreteProtein();
     resetBtn.onclick   =()=>resetNetwork();
