@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – 150‑node network (zoomable)</title>
+  <title>Cubic cell – path‑limited propagation</title>
 
   <!-- A‑Frame, AR.js and meshline -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
@@ -23,7 +23,7 @@
     #resetBtn{bottom:12px;left:12px}
     #startBtn{bottom:12px;right:12px;display:none}
 
-    /* zoom buttons sit together in the centre‑bottom */
+    /* zoom buttons in the middle‑bottom */
     #zoomInBtn,#zoomOutBtn{bottom:12px}
     #zoomInBtn{left:calc(50% - 34px)}
     #zoomOutBtn{left:calc(50% + 2px)}
@@ -56,7 +56,7 @@
     <a-entity id="cam" camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate component -->
+  <!-- drag‑rotate component (unchanged) -->
   <script>
     AFRAME.registerComponent('drag-rotate', {
       schema: { speed: { default: 1 } },
@@ -96,17 +96,21 @@
     const zoomInBtn= document.getElementById('zoomInBtn');
     const zoomOutBtn=document.getElementById('zoomOutBtn');
 
-    const N_NODES       = 85;   // total (including the star)
-    const PROP_INTERVAL = 1200;  // ms between propagation waves
+    const N_NODES       = 150;  // including the star & endpoints
+    const N_ENDPOINTS   = 4;    // <‑‑  number of green targets
+    const PROP_INTERVAL = 900;  // ms between “wave” steps
+
     const SCALE_MIN     = 1;
     const SCALE_MAX     = 10;
-    let   currentScale  = 4;     // matches initial scale attribute
+    let   currentScale  = 4;
 
     /* data stores */
-    const nodes = [], edges = [];
-    let timers  = [];
+    const nodes = [];         // {id,x,y,z,type,el}
+    const edges = [];         // {id,a,b,el}
+    const endpointIdx = [];   // indices in `nodes`
+    let timers  = [];         // animation time‑outs
 
-    /******** Zoom helpers ********/
+    /******** Zoom helpers (identical to previous version) ********/
     function setCellScale(s){
       currentScale = Math.min(Math.max(s, SCALE_MIN), SCALE_MAX);
       const v = `${currentScale} ${currentScale} ${currentScale}`;
@@ -114,59 +118,43 @@
     }
     zoomInBtn.addEventListener('click',  () => setCellScale(currentScale * 1.2));
     zoomOutBtn.addEventListener('click', () => setCellScale(currentScale / 1.2));
-
-    /* mouse‑wheel / track‑pad */
     window.addEventListener('wheel', e => {
-      const dir = e.deltaY < 0 ? 1 : -1;   // up=zoom in, down=zoom out
+      const dir = e.deltaY < 0 ? 1 : -1;
       setCellScale(currentScale * (dir>0 ? 1.1 : 0.9));
     }, {passive:true});
-
-    /* pinch‑to‑zoom (basic) */
-    let pinchStartDist = null;
-    window.addEventListener('touchmove', e=>{
+    /* pinch */
+    let pinchStartDist=null;
+    window.addEventListener('touchmove',e=>{
       if(e.touches.length===2){
         const [t0,t1]=e.touches;
-        const d = Math.hypot(t0.clientX-t1.clientX, t0.clientY-t1.clientY);
+        const d=Math.hypot(t0.clientX-t1.clientX,t0.clientY-t1.clientY);
         if(pinchStartDist===null) pinchStartDist=d;
-        else{
-          const factor = d / pinchStartDist;
-          setCellScale(currentScale * factor);
-          pinchStartDist=d;  // reset for next frame
-        }
+        else{ setCellScale(currentScale*(d/pinchStartDist)); pinchStartDist=d; }
         e.preventDefault();
       }
-    }, {passive:false});
-    window.addEventListener('touchend',()=>{ pinchStartDist=null; });
+    },{passive:false});
+    window.addEventListener('touchend',()=>{pinchStartDist=null;});
 
-    /******** Static organelles (walls, nucleus, Golgi) ********/
+    /******** Static organelles (unchanged) ********/
     function addOrganelles(){
-      /* cube “cell wall” – thick black mesh lines */
-      const h = 0.8;
-      const EDGE_WIDTH = 0.08;
-      const EDGE_COLOR = '#000';
-
-      const seg = [[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-                   [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-                   [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-                   [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-                   [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-                   [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
+      const h=0.8, EDGE_WIDTH=0.08, EDGE_COLOR='#000';
+      const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+                 [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+                 [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+                 [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+                 [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+                 [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
       seg.forEach(p=>{
-        const s = p[0].join(' '), e = p[1].join(' ');
+        const s=p[0].join(' '),e=p[1].join(' ');
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="path: ${s}, ${e}; color: ${EDGE_COLOR}; lineWidth: ${EDGE_WIDTH}; sizeAttenuation: true; worldUnits: true"></a-entity>`);
+          `<a-entity meshline="path:${s},${e};color:${EDGE_COLOR};lineWidth:${EDGE_WIDTH};sizeAttenuation:true;worldUnits:true"></a-entity>`);
       });
-
-      /* nucleus + membrane */
-      const nY = -0.55;
+      const nY=-0.55;
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-sphere>
         <a-sphere radius="0.28" position="0 ${nY} 0"
-                  material="color:#dda0dd;opacity:0.2;transparent:true;side:double"></a-sphere>
-      `);
-
-      /* Golgi bodies */
+                  material="color:#dda0dd;opacity:0.2;transparent:true;side:double"></a-sphere>`);
       [0.55,0.42,0.34].forEach((w,i)=>{
         cell.insertAdjacentHTML('beforeend',
           `<a-box width="${w}" height="0.05" depth="${(w*0.58).toFixed(3)}"
@@ -175,113 +163,166 @@
       });
     }
 
-    /******** Cytoskeleton (random cyan filaments) ********/
+    /******** Cytoskeleton (unchanged) ********/
     function addCytoskeleton(){
       const rnd=(a,b)=>Math.random()*(b-a)+a;
       for(let i=0;i<90;i++){
-        const a=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
-        const b=[rnd(-0.75,0.75), rnd(-0.75,0.75), rnd(-0.75,0.75)];
+        const a=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)];
+        const b=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)];
         cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start:${a.join(' ')}; end:${b.join(' ')}; color:#00ffff;transparent:true;opacity:0.3"></a-entity>`);
+          `<a-entity line="start:${a.join(' ')};end:${b.join(' ')};color:#00ffff;transparent:true;opacity:0.3"></a-entity>`);
       }
     }
 
-    /******** Network generation ********/
+    /******** Network generation (adds green end‑points) ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* START NODE – bright yellow star billboard at top centre */
-      const startY = 0.9;
+      /* yellow start ‑ star glyph */
+      const startY=0.9;
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
-
-      /* block around nucleus – avoid inside bottom nucleus */
-      const nC={x:0,y:-0.55,z:0}, nR=0.30;
-
-      /* fill the rest with random nodes */
+      /* nucleus exclusion */
+      const nC={x:0,y:-0.55,z:0},nR=0.30;
+      /* rest random */
       while(nodes.length<N_NODES){
-        const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
-        const d=Math.sqrt((x-nC.x)**2 + (y-nC.y)**2 + (z-nC.z)**2);
-        if(d<nR) continue;
+        const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
+        if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<nR) continue;
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
+      /* choose green end‑points */
+      while(endpointIdx.length<N_ENDPOINTS){
+        const idx=Math.floor(Math.random()*(nodes.length-1))+1; // exclude start
+        if(!endpointIdx.includes(idx)) endpointIdx.push(idx);
+      }
+      endpointIdx.forEach(i=>nodes[i].type='endpoint');
 
-      /* instantiate visuals */
+      /* visuals */
       nodes.forEach(n=>{
         if(n.type==='star'){
           cell.insertAdjacentHTML('beforeend',
             `<a-entity id="${n.id}"
-                      text="value: ★; color: #ffff00; align: center; anchor: center; baseline: center; side: double; shader: flat; width: 1.5"
-                      position="${n.x} ${n.y} ${n.z}"></a-entity>`);
+               text="value:★;color:#ffff00;align:center;anchor:center;baseline:center;shader:flat;width:1.5"
+               position="${n.x} ${n.y} ${n.z}"></a-entity>`);
+        }else if(n.type==='endpoint'){
+          cell.insertAdjacentHTML('beforeend',
+            `<a-sphere id="${n.id}" radius="0.08" color="#00ff00"
+               position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         }else{
           cell.insertAdjacentHTML('beforeend',
-            `<a-sphere id="${n.id}" radius="0.06" color="#888" position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+            `<a-sphere id="${n.id}" radius="0.06" color="#888"
+               position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         }
         n.el=document.getElementById(n.id);
       });
 
-      /* connect each node to its three nearest neighbours (undirected) */
+      /* edges: each node to its three nearest neighbours */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
                          .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
-          const j=dists[k].j;if(j<i)continue; // avoid duplicate
+          const j=dists[k].j;if(j<i)continue;
           const id=`e${edges.length}`;
-          const s=`${n.x} ${n.y} ${n.z}`;
-          const e=`${nodes[j].x} ${nodes[j].y} ${nodes[j].z}`;
           cell.insertAdjacentHTML('beforeend',
-            `<a-entity id="${id}" line="start:${s}; end:${e}; color:#666"></a-entity>`);
+            `<a-entity id="${id}" line="start:${n.x} ${n.y} ${n.z};end:${nodes[j].x} ${nodes[j].y} ${nodes[j].z};color:#666"></a-entity>`);
           edges.push({id,a:i,b:j,el:document.getElementById(id)});
           added++;
         }
       });
     }
 
-    /******** Colour‑reset / propagation helpers ********/
-    function setNodeColour(node, col){
+    /******** Colour helpers ********/
+    function setNodeColour(node,col){
       if(node.el.hasAttribute('text')){
         node.el.setAttribute('text',`color:${col}`);
-      }else{
-        node.el.setAttribute('color',col);
-      }
+      }else{ node.el.setAttribute('color',col); }
     }
-    function resetColours(defaultCol){
+    function resetColours(defaultCol='#666'){
       nodes.forEach(n=>{
-        const col = n.type==='star' ? '#ffff00' : defaultCol;
+        let col=defaultCol;
+        if(n.type==='star')      col='#ffff00';
+        else if(n.type==='endpoint') col='#00ff00';
         setNodeColour(n,col);
       });
       edges.forEach(e=>e.el.setAttribute('line',`color:${defaultCol}`));
     }
 
+    /******** Path‑limited propagation ********/
     function propagate(){
       timers.forEach(clearTimeout); timers=[];
       resetColours('#888');
-      const visited=new Set([0]), waves=[[0]];
-      while(waves[waves.length-1].length){
-        const nxt=[];
-        waves[waves.length-1].forEach(i=>{
-          edges.forEach(e=>{
-            const nb=e.a===i?e.b:e.b===i?e.a:null;
-            if(nb!==null && !visited.has(nb)){visited.add(nb);nxt.push(nb);}  
-          });
-        });
-        if(nxt.length) waves.push(nxt); else break;
-      }
-      waves.forEach((wave,w)=>{
-        timers.push(setTimeout(()=>{
-          wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
-          edges.forEach(e=>{
-            const ca=nodes[e.a].el.hasAttribute('text') ? nodes[e.a].el.getAttribute('text').color : nodes[e.a].el.getAttribute('color');
-            const cb=nodes[e.b].el.hasAttribute('text') ? nodes[e.b].el.getAttribute('text').color : nodes[e.b].el.getAttribute('color');
-            if(ca==="#ff0000" && cb==="#ff0000")
-              e.el.setAttribute('line','color:#ff0000');
-          });
-        },w*PROP_INTERVAL));
+
+      const start=0;                       // index of star
+      /* ----- build adjacency list ----- */
+      const adj=Array(nodes.length).fill().map(()=>[]);
+      const edgeMap=new Map();             // "u-v" => edgeIdx
+      edges.forEach((e,ei)=>{
+        adj[e.a].push(e.b); adj[e.b].push(e.a);
+        edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,ei);
       });
+
+      /* ----- BFS from star until all endpoints discovered ----- */
+      const prev=Array(nodes.length).fill(-1);
+      const dist=Array(nodes.length).fill(Infinity);
+      const q=[start]; dist[start]=0;
+      let found=0;
+      while(q.length && found<endpointIdx.length){
+        const u=q.shift();
+        adj[u].forEach(v=>{
+          if(dist[v]!==Infinity) return;
+          prev[v]=u; dist[v]=dist[u]+1; q.push(v);
+          if(endpointIdx.includes(v)) found++;
+        });
+      }
+
+      /* ----- gather all nodes / edges on the union of shortest paths ----- */
+      const pathNodes=new Set([start]);
+      const pathEdges=new Set();
+      endpointIdx.forEach(ep=>{
+        let u=ep;
+        while(u!==start && u!==-1){
+          pathNodes.add(u);
+          const p=prev[u];
+          const key=`${Math.min(u,p)}-${Math.max(u,p)}`;
+          if(edgeMap.has(key)) pathEdges.add(edgeMap.get(key));
+          u=p;
+        }
+      });
+
+      /* compute distance *along the star‑endpoint paths* only */
+      const pathDist={};
+      [...pathNodes].forEach(i=>pathDist[i]=Infinity);
+      pathDist[start]=0;
+      const toVisit=[start];
+      while(toVisit.length){
+        const u=toVisit.shift();
+        adj[u].forEach(v=>{
+          if(!pathNodes.has(v) || pathDist[v]!==Infinity) return;
+          if(pathEdges.has(edgeMap.get(`${Math.min(u,v)}-${Math.max(u,v)}`))){
+            pathDist[v]=pathDist[u]+1;
+            toVisit.push(v);
+          }
+        });
+      }
+      const maxStep=Math.max(...Object.values(pathDist));
+
+      /* ----- animated wave along the paths ----- */
+      for(let step=0; step<=maxStep; step++){
+        timers.push(setTimeout(()=>{
+          /* colour nodes at this step */
+          Object.entries(pathDist).forEach(([idx,d])=>{
+            if(d==step) setNodeColour(nodes[idx],'#ff0000');
+          });
+          /* colour edges whose both ends have d<=step */
+          pathEdges.forEach(ei=>{
+            const e=edges[ei];
+            if(pathDist[e.a]<=step && pathDist[e.b]<=step){
+              e.el.setAttribute('line','color:#ff0000');
+            }
+          });
+        }, step*PROP_INTERVAL));
+      }
     }
-    function resetNetwork(){
-      timers.forEach(clearTimeout);timers=[];
-      resetColours('#666');
-    }
+    function resetNetwork(){timers.forEach(clearTimeout);timers=[];resetColours('#666');}
 
     /******** Lifecycle ********/
     scene.addEventListener('loaded',()=>{
@@ -302,12 +343,11 @@
       resetNetwork();
     });
 
-    startBtn.addEventListener('click', () => {
+    startBtn.addEventListener('click',()=>{
       propagate();
-      startBtn.style.display = 'none';
+      startBtn.style.display='none';
     });
-
-    resetBtn.addEventListener('click', () => {
+    resetBtn.addEventListener('click',()=>{
       resetNetwork();
       propagate();
     });
