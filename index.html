@@ -2,13 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – spaced nodes + cylinder edges</title>
+  <title>Cubic cell – cylinders everywhere, thinner links</title>
 
   <!-- A‑Frame & AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
-  <!-- meshline still loaded for the cube frame; harmless to keep -->
-  <script src="https://raw.githack.com/spite/aframe-meshline-component/master/dist/aframe-meshline-component.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
@@ -48,7 +46,7 @@
     <a-entity id="cam" camera></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate – unchanged -->
+  <!-- drag‑rotate -->
   <script>
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
@@ -88,12 +86,14 @@
           zoomOutBtn=document.getElementById('zoomOutBtn');
 
     const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
-          SCALE_MIN=1, SCALE_MAX=10;
+          SCALE_MIN=1, SCALE_MAX=10,
+          NETWORK_RADIUS=0.006,   // << thinner links
+          CUBE_RADIUS   =0.02;    // cube frame a bit bolder
     let currentScale=4;
 
     const nodes=[],edges=[],endpointIdx=[],timers=[];
 
-    /******** Zoom (unchanged) ********/
+    /******** Zoom ********/
     function setCellScale(s){
       currentScale=Math.min(Math.max(s,SCALE_MIN),SCALE_MAX);
       cell.setAttribute('scale',`${currentScale} ${currentScale} ${currentScale}`);
@@ -112,53 +112,57 @@
     },{passive:false});
     window.addEventListener('touchend',()=>pinchStart=null);
 
-    /******** Static organelles (unchanged) ********/
+    /******** Helper: add a cylinder between two Vec3s ********/
+    function addCylinder(aVec,bVec,radius,color,parent){
+      const mid=aVec.clone().add(bVec).multiplyScalar(0.5);
+      const len=aVec.distanceTo(bVec);
+      const id=`cyl-${Math.random().toString(36).slice(2)}`;
+      parent.insertAdjacentHTML('beforeend',`
+        <a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
+                    radius="${radius}" height="${len}" color="${color}"
+                    material="opacity:0.9;shader:flat"></a-cylinder>`);
+      const cyl=document.getElementById(id);
+      const dir=bVec.clone().sub(aVec).normalize();
+      const up=new THREE.Vector3(0,1,0);
+      cyl.object3D.quaternion.setFromUnitVectors(up,dir);
+      return cyl;
+    }
+
+    /******** Static organelles – nucleus + cube frame ********/
     function addOrganelles(){
-      const h=0.8, EDGE_WIDTH=0.08, EDGE_COLOR='#000';
-      const seg=[[[-h,-h,-h],[-h, h,-h]],[[ h,-h,-h],[ h, h,-h]],
-                 [[-h,-h, h],[-h, h, h]],[[ h,-h, h],[ h, h, h]],
-                 [[-h, h,-h],[ h, h,-h]],[[ h, h,-h],[ h, h, h]],
-                 [[ h, h, h],[-h, h, h]],[[-h, h, h],[-h, h,-h]],
-                 [[-h,-h,-h],[ h,-h,-h]],[[ h,-h,-h],[ h,-h, h]],
-                 [[ h,-h, h],[-h,-h, h]],[[-h,-h, h],[-h,-h,-h]]];
+      /* cube edges as cylinders */
+      const h=0.8;
+      const seg=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+                 [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+                 [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+                 [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+                 [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+                 [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
       seg.forEach(p=>{
-        cell.insertAdjacentHTML('beforeend',
-          `<a-entity meshline="path:${p[0].join(' ')},${p[1].join(' ')};color:${EDGE_COLOR};lineWidth:${EDGE_WIDTH};sizeAttenuation:true;worldUnits:true"></a-entity>`);
+        const a=new THREE.Vector3(...p[0]);
+        const b=new THREE.Vector3(...p[1]);
+        addCylinder(a,b,CUBE_RADIUS,'#000',cell);
       });
+
+      /* nucleus only (Golgi removed) */
       const nY=-0.55;
       cell.insertAdjacentHTML('beforeend',`
         <a-sphere radius="0.25" position="0 ${nY} 0"
                   material="color:#800080;opacity:0.5;transparent:true;side:double"></a-sphere>
         <a-sphere radius="0.28" position="0 ${nY} 0"
-                  material="color:#dda0dd;opacity:0.2;transparent:true;side:double"></a-sphere>`);
-      [0.55,0.42,0.34].forEach((w,i)=>{
-        cell.insertAdjacentHTML('beforeend',
-          `<a-box width="${w}" height="0.05" depth="${(w*0.58).toFixed(3)}"
-                  position="-0.55 ${(0.25-i*0.08).toFixed(2)} 0"
-                  material="color:#cd853f;opacity:0.8"></a-box>`);});
+                  material="color:#dda0dd;opacity:0.25;transparent:true;side:double"></a-sphere>`);
     }
 
-    /******** Cytoskeleton (unchanged) ********/
-    function addCytoskeleton(){
-      const rnd=(a,b)=>Math.random()*(b-a)+a;
-      for(let i=0;i<90;i++){
-        const a=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)],
-              b=[rnd(-0.75,0.75),rnd(-0.75,0.75),rnd(-0.75,0.75)];
-        cell.insertAdjacentHTML('beforeend',
-          `<a-entity line="start:${a.join(' ')};end:${b.join(' ')};color:#00ffff;transparent:true;opacity:0.3"></a-entity>`);}
-    }
-
-    /******** Network generation – cylinder edges ********/
+    /******** Network generation (cylinder links) ********/
     const rnd=(a,b)=>Math.random()*(b-a)+a;
     function buildNetwork(){
-      /* blue start node */
+      /* blue start */
       const startY=0.9;
       nodes.push({id:'n0',x:0,y:startY,z:0,type:'star'});
-
       /* nucleus params */
       const nC={x:0,y:-0.55,z:0}, nR=0.30;
 
-      /* green endpoints inside nucleus */
+      /* endpoints inside nucleus */
       while(endpointIdx.length<N_ENDPOINTS){
         let x,y,z;
         do{
@@ -170,7 +174,7 @@
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'endpoint'});
       }
 
-      /* rest of nodes */
+      /* remaining nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
         if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<nR) continue;
@@ -179,40 +183,25 @@
 
       /* visuals */
       nodes.forEach(n=>{
-        const rad = n.type==='sphere'?0.04:0.06;
-        const col = n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#888';
+        const r=n.type==='sphere'?0.04:0.06;
+        const c=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#888';
         cell.insertAdjacentHTML('beforeend',
-          `<a-sphere id="${n.id}" radius="${rad}" color="${col}"
+          `<a-sphere id="${n.id}" radius="${r}" color="${c}"
                      position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         n.el=document.getElementById(n.id);
       });
 
       /* cylinder edges */
       nodes.forEach((n,i)=>{
-        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)})).sort((a,b)=>a.dist-b.dist);
+        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+                         .sort((a,b)=>a.dist-b.dist);
         let added=0;
         for(let k=1;k<dists.length&&added<3;k++){
           const j=dists[k].j;if(j<i)continue;
-
-          const p1=new THREE.Vector3(n.x,n.y,n.z);
-          const p2=new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z);
-          const mid=p1.clone().add(p2).multiplyScalar(0.5);
-          const len=p1.distanceTo(p2);
-
-          const id=`e${edges.length}`;
-          cell.insertAdjacentHTML('beforeend',`
-            <a-cylinder id="${id}"
-                        position="${mid.x} ${mid.y} ${mid.z}"
-                        radius="0.01" height="${len}"
-                        color="#666" material="opacity:0.8;shader:flat"></a-cylinder>`);
-          const cyl=document.getElementById(id);
-          /* orient cylinder so its Y‑axis points p1→p2 */
-          const dir=p2.clone().sub(p1).normalize();
-          const up=new THREE.Vector3(0,1,0);
-          const quat=new THREE.Quaternion().setFromUnitVectors(up,dir);
-          cyl.object3D.quaternion.copy(quat);
-
-          edges.push({id,a:i,b:j,el:cyl});
+          const a=new THREE.Vector3(n.x,n.y,n.z);
+          const b=new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z);
+          const cyl=addCylinder(a,b,NETWORK_RADIUS,'#666',cell);
+          edges.push({a:i,b:j,el:cyl});
           added++;
         }
       });
@@ -222,19 +211,18 @@
     function setNodeColour(n,c){ n.el.setAttribute('color',c); }
     function resetColours(base='#666'){
       nodes.forEach(n=>{
-        let c=base;
-        if(n.type==='star') c='#0000ff';
-        else if(n.type==='endpoint') c='#00ff00';
+        let c=base;if(n.type==='star')c='#0000ff';else if(n.type==='endpoint')c='#00ff00';
         setNodeColour(n,c);
       });
       edges.forEach(e=>e.el.setAttribute('color',base));
     }
 
-    /******** Path‑limited propagation (edge colour uses .color) ********/
+    /******** Path‑limited propagation (unchanged logic) ********/
     function propagate(){
       timers.forEach(clearTimeout);timers.length=0;
       resetColours('#888');
 
+      /* adjacency */
       const adj=Array(nodes.length).fill().map(()=>[]);
       const edgeMap=new Map();
       edges.forEach((e,i)=>{
@@ -242,16 +230,19 @@
         edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);
       });
 
-      const start=0,prev=new Array(nodes.length).fill(-1),dist=new Array(nodes.length).fill(Infinity);
+      /* BFS */
+      const start=0,prev=Array(nodes.length).fill(-1),dist=Array(nodes.length).fill(Infinity);
       const q=[start];dist[start]=0;let found=0;
       while(q.length&&found<endpointIdx.length){
         const u=q.shift();
         adj[u].forEach(v=>{
           if(dist[v]!==Infinity)return;
           prev[v]=u;dist[v]=dist[u]+1;q.push(v);
-          if(endpointIdx.includes(v))found++;});
+          if(endpointIdx.includes(v))found++;
+        });
       }
 
+      /* collect paths */
       const pathNodes=new Set([start]),pathEdges=new Set();
       endpointIdx.forEach(ep=>{
         let u=ep;
@@ -263,7 +254,9 @@
         }
       });
 
-      const pathDist={},toVisit=[start];pathNodes.forEach(i=>pathDist[i]=Infinity);pathDist[start]=0;
+      /* distance along path graph */
+      const pathDist={},toVisit=[start];pathNodes.forEach(i=>pathDist[i]=Infinity);
+      pathDist[start]=0;
       while(toVisit.length){
         const u=toVisit.shift();
         adj[u].forEach(v=>{
@@ -275,6 +268,7 @@
       }
       const maxStep=Math.max(...Object.values(pathDist));
 
+      /* animate */
       for(let s=0;s<=maxStep;s++){
         timers.push(setTimeout(()=>{
           Object.entries(pathDist).forEach(([i,d])=>{
@@ -293,7 +287,8 @@
     /******** Lifecycle ********/
     scene.addEventListener('loaded',()=>{
       loader.style.display='none';
-      addOrganelles();addCytoskeleton();buildNetwork();
+      addOrganelles();               // cube frame + nucleus
+      buildNetwork();                // nodes + network edges
     });
     marker.addEventListener('markerFound',()=>{
       cell.setAttribute('visible',true);
@@ -306,7 +301,7 @@
       startBtn.style.display='none';
       resetNetwork();
     });
-    startBtn.onclick=()=>{propagate();startBtn.style.display='none';};
+    startBtn.onclick =()=>{propagate();startBtn.style.display='none';};
     resetBtn.onclick =()=>{resetNetwork();propagate();};
   </script>
 </body>
