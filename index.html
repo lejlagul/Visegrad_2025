@@ -2,18 +2,35 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Cubic cell – DNA helix & gene nodes</title>
+  <title>Cubic cell – orange nucleus, small DNA</title>
 
-  <!-- A‑Frame & AR.js -->
+  <!-- A‑Frame & AR.js -->
   <script src="https://aframe.io/releases/1.7.1/aframe.min.js"></script>
   <script src="https://raw.githack.com/AR-js-org/AR.js/3.4.7/aframe/build/aframe-ar.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <style>/* —— same button / loader styling as previous answer —— */</style>
+  <style>
+    body{margin:0;overflow:hidden;font-family:monospace}
+    #status{position:fixed;top:10px;left:10px;font-size:24px;color:#fff;z-index:1000}
+    .btn{position:fixed;padding:6px 12px;font:16px monospace;
+         background:#222;color:#fff;border:1px solid #888;border-radius:4px;
+         opacity:0.9;z-index:1000}
+    #resetBtn   {bottom:12px;left:12px}
+    #pathBtn    {bottom:12px;right:12px;display:none}
+    #diffuseBtn {bottom:56px;right:12px;display:none}
+    #secreteBtn {bottom:100px;right:12px;display:none}
+    #zoomInBtn  {bottom:12px;left:calc(50% - 34px)}
+    #zoomOutBtn {bottom:12px;left:calc(50% + 2px)}
+    #loader{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:center;
+            align-items:center;background:#000}
+    .spinner{width:48px;height:48px;border:6px solid #fff;border-top-color:transparent;
+             border-radius:50%;animation:spin 1s linear infinite}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
 </head>
 
 <body>
-  <!-- UI buttons (unchanged) -->
+  <!-- UI -->
   <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading camera…</p></div>
   <div id="status">Searching…</div>
   <button id="resetBtn"   class="btn">Reset</button>
@@ -26,167 +43,262 @@
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
     <a-marker id="hiroMarker" preset="hiro" emitevents="true">
       <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
+      <!-- extracellular bacterium -->
       <a-cylinder id="bacterium" radius="0.12" height="0.36"
-                  color="#35c94a" position="0 2.2 0" rotation="90 0 0"></a-cylinder>
+                  color="#35c94a" position="0 4 0" rotation="90 0 0"></a-cylinder>
     </a-marker>
     <a-entity camera></a-entity>
   </a-scene>
 
   <!-- drag‑rotate component (unchanged) -->
-  <script>/* … same drag‑rotate JS … */</script>
+  <script>
+    AFRAME.registerComponent('drag-rotate',{
+      schema:{speed:{default:1}},
+      init(){
+        const cvs=this.el.sceneEl.canvas;
+        let drag=false,px=0,py=0;
+        const start=e=>{drag=true;px=e.clientX;py=e.clientY;};
+        const move=(x,y,f=1)=>{
+          if(!drag)return;
+          const r=this.el.getAttribute('rotation');
+          this.el.setAttribute('rotation',{
+            x:r.x+(y-py)*f*this.data.speed,
+            y:r.y+(x-px)*f*this.data.speed,
+            z:r.z});
+          px=x;py=y;
+        };
+        cvs.addEventListener('mousedown',e=>start(e));
+        window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+        window.addEventListener('mouseup',()=>drag=false);
+        cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
+        window.addEventListener('touchmove',e=>{
+          if(drag){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},{passive:false});
+        window.addEventListener('touchend',()=>drag=false);
+      }});
+  </script>
 
   <script>
-    /* ===== constants & handles ===== */
-    const cell=document.getElementById('cell'),
-          bacterium=document.getElementById('bacterium'),
-          statusTxt=document.getElementById('status'),
-          loader=document.getElementById('loader'),
-          marker=document.getElementById('hiroMarker'),
-          pathBtn=document.getElementById('pathBtn'),
-          diffuseBtn=document.getElementById('diffuseBtn'),
-          secreteBtn=document.getElementById('secreteBtn'),
-          resetBtn=document.getElementById('resetBtn'),
-          zoomInBtn=document.getElementById('zoomInBtn'),
-          zoomOutBtn=document.getElementById('zoomOutBtn');
+    /* === constants & handles === */
+    const cell=document.getElementById('cell'), marker=document.getElementById('hiroMarker');
+    const buttons={path:document.getElementById('pathBtn'),
+                   diffuse:document.getElementById('diffuseBtn'),
+                   secrete:document.getElementById('secreteBtn'),
+                   reset:document.getElementById('resetBtn'),
+                   zoomIn:document.getElementById('zoomInBtn'),
+                   zoomOut:document.getElementById('zoomOutBtn')};
+    const loader=document.getElementById('loader'), statusTxt=document.getElementById('status');
 
-    const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
-          NETWORK_RADIUS=0.006, CUBE_RADIUS=0.02,
-          DNA_RADIUS=0.12, DNA_HEIGHT=0.5, DNA_TURNS=3,
+    const N_NODES=150, N_GENES=4, PROP_INTERVAL=900,
+          NET_R=0.006, FRAME_R=0.02,
+          DNA_R=0.08, DNA_H=0.35, DNA_TURNS=3,
           SCALE_MIN=1, SCALE_MAX=10;
-    let currentScale=4, secretedCount=0;
+    let curScale=4, secreted=0;
 
-    const nodes=[],edges=[],endpointIdx=[],timers=[];
+    const nodes=[],edges=[],geneIdx=[],timers=[];
 
-    /* ===== cylinders helper ===== */
-    function addCylinder(a,b,r,col,parent){
-      const mid=a.clone().add(b).multiplyScalar(0.5);
-      const len=a.distanceTo(b);
-      const id=`cyl-${Math.random().toString(36).slice(2)}`;
-      parent.insertAdjacentHTML('beforeend',
-        `<a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
-                     radius="${r}" height="${len}" color="${col}"
-                     material="opacity:0.9;shader:flat"></a-cylinder>`);
-      document.getElementById(id).object3D.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0,1,0), b.clone().sub(a).normalize());
-      return id;
-    }
-
-    /* ===== cube frame & yellow nucleus ===== */
-    function drawFrameAndNucleus(){
-      const h=0.8, edges=[[[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-                          [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-                          [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-                          [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-                          [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-                          [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
-      edges.forEach(p=>addCylinder(
-        new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),CUBE_RADIUS,'#000',cell));
-      const nY=-0.55;
-      cell.insertAdjacentHTML('beforeend',
-        `<a-sphere radius="0.25" position="0 ${nY} 0"
-                   material="color:#ffff00;opacity:0.45;transparent:true;side:double"></a-sphere>
-         <a-sphere radius="0.28" position="0 ${nY} 0"
-                   material="color:#ffffaa;opacity:0.15;transparent:true;side:double"></a-sphere>`);
-    }
-
-    /* ===== DNA double‑helix ===== */
-    function addDNA(){
-      const nC=new THREE.Vector3(0,-0.55,0);
-      const total=DNA_TURNS*2*Math.PI, step=0.3;
-      let lastA=null, lastB=null;
-      for(let t=0;t<=total;t+=step){
-        const y=nC.y-DNA_HEIGHT/2 + (t/total)*DNA_HEIGHT;
-        const a=new THREE.Vector3(DNA_RADIUS*Math.cos(t), y, DNA_RADIUS*Math.sin(t)).add(nC);
-        const b=new THREE.Vector3(DNA_RADIUS*Math.cos(t+Math.PI), y, DNA_RADIUS*Math.sin(t+Math.PI)).add(nC);
-        if(lastA) addCylinder(lastA,a,0.005,'#ff0000',cell);
-        if(lastB) addCylinder(lastB,b,0.005,'#0000ff',cell);
-        /* rung every ~0.6 rad */
-        if(Math.abs((t/step)%2)<1e-3) addCylinder(a,b,0.003,'#888',cell);
-        lastA=a; lastB=b;
-      }
-      return nC;
-    }
-
-    /* ===== build whole scene graph (nodes + DNA) ===== */
+    /* === helpers === */
     const rnd=(a,b)=>Math.random()*(b-a)+a;
-    function buildNetwork(){
-      cell.innerHTML='';           // wipe previous
-      nodes.length=edges.length=endpointIdx.length=0;
-      drawFrameAndNucleus();
-      const nC=addDNA();           // returns centre vector of nucleus
+    function cyl(a,b,r,c,parent){
+      const mid=a.clone().add(b).multiplyScalar(0.5), len=a.distanceTo(b);
+      parent.insertAdjacentHTML('beforeend',`
+        <a-cylinder radius="${r}" height="${len}" color="${c}"
+                    position="${mid.x} ${mid.y} ${mid.z}"
+                    material="opacity:0.9;shader:flat"></a-cylinder>`);
+      const el=parent.lastElementChild;
+      el.object3D.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),b.clone().sub(a).normalize());
+      return el;
+    }
 
-      /* blue start node just under membrane */
-      nodes.push({id:'n0',x:0,y:0.9,z:0,type:'star'});
+    /* === frame + orange nucleus === */
+    function addOrganelles(){
+      const h=0.8;
+      [[-h,-h,-h],[-h, h,-h]],[[ h,-h,-h],[ h, h,-h]],[[ h,-h, h],[ h, h, h]],[[-h,-h, h],[-h, h, h]],
+      [[-h, h,-h],[ h, h,-h]],[[ h, h,-h],[ h, h, h]],[[ h, h, h],[-h, h, h]],[[-h, h, h],[-h, h,-h]],
+      [[-h,-h,-h],[ h,-h,-h]],[[ h,-h,-h],[ h,-h, h]],[[ h,-h, h],[-h,-h, h]],[[-h,-h, h],[-h,-h,-h]]
+      .forEach(p=>cyl(new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),FRAME_R,'#000',cell));
+      const nY=-0.55;
+      cell.insertAdjacentHTML('beforeend',`
+        <a-sphere radius="0.25" position="0 ${nY} 0"
+                  material="color:#ffa500;opacity:0.45;transparent:true;side:double"></a-sphere>
+        <a-sphere radius="0.28" position="0 ${nY} 0"
+                  material="color:#ffbb55;opacity:0.15;transparent:true;side:double"></a-sphere>`);
+    }
+
+    /* === DNA helix inside nucleus === */
+    function addDNA(){
+      const centre=new THREE.Vector3(0,-0.55,0);
+      const total=DNA_TURNS*2*Math.PI, step=0.28;
+      let prevA=null,prevB=null;
+      for(let t=0;t<=total;t+=step){
+        const frac=t/total, y=centre.y-DNA_H/2+frac*DNA_H;
+        const a=new THREE.Vector3(DNA_R*Math.cos(t),y,DNA_R*Math.sin(t)).add(centre);
+        const b=new THREE.Vector3(DNA_R*Math.cos(t+Math.PI),y,DNA_R*Math.sin(t+Math.PI)).add(centre);
+        if(prevA) cyl(prevA,a,0.004,'#ff4040',cell);
+        if(prevB) cyl(prevB,b,0.004,'#4040ff',cell);
+        if(Math.abs((t/step)%2)<1e-3) cyl(a,b,0.003,'#777',cell);   // rung
+        prevA=a;prevB=b;
+      }
+      return centre;
+    }
+
+    /* === build network === */
+    function buildNetwork(){
+      cell.innerHTML='';
+      nodes.length=edges.length=geneIdx.length=0;
+      addOrganelles();
+      const centre=addDNA();
+
+      /* start node */
+      nodes.push({id:'n0',x:0,y:0.9,z:0,type:'start'});
 
       /* gene nodes on helix axis */
-      for(let g=1;g<=N_ENDPOINTS;g++){
-        const frac=g/(N_ENDPOINTS+1);                 // 0..1
-        const y=nC.y-DNA_HEIGHT/2 + frac*DNA_HEIGHT;  // along helix core
-        nodes.push({id:`n${nodes.length}`,x:0,y,z:0,type:'endpoint'});
-        endpointIdx.push(nodes.length-1);
+      for(let g=1;g<=N_GENES;g++){
+        const y=centre.y-DNA_H/2+g/(N_GENES+1)*DNA_H;
+        geneIdx.push(nodes.length);
+        nodes.push({id:`n${nodes.length}`,x:0,y,z:0,type:'gene'});
       }
 
-      /* remaining random cytoplasmic nodes */
-      const nucleusR=0.30;
+      /* random cytoplasmic nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
-        if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<nucleusR) continue;
+        if(Math.hypot(x-centre.x,y-centre.y,z-centre.z)<0.3) continue;
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
-      /* visuals for nodes */
+      /* visuals */
       nodes.forEach(n=>{
-        const r=n.type==='sphere'?0.04:0.06;
-        const col=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#888';
+        const r=n.type==='sphere'?0.035:0.055,
+              col=n.type==='start'?'#0000ff':n.type==='gene'?'#00ff00':'#888';
         cell.insertAdjacentHTML('beforeend',
           `<a-sphere id="${n.id}" radius="${r}" color="${col}"
                      position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
         n.el=document.getElementById(n.id);
       });
 
-      /* network edges (3 nearest) */
+      /* edges (3 nearest) */
       nodes.forEach((n,i)=>{
-        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
-                         .sort((a,b)=>a.dist-b.dist);
-        let added=0;
-        for(let k=1;k<dists.length&&added<3;k++){
-          const j=dists[k].j;if(j<i)continue;
-          const id=addCylinder(
-            new THREE.Vector3(n.x,n.y,n.z),
-            new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
-            NETWORK_RADIUS,'#666',cell);
-          edges.push({a:i,b:j,el:document.getElementById(id)});
-          added++;
+        const d=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)})).sort((a,b)=>a.dist-b.dist);
+        let add=0;
+        for(let k=1;k<d.length&&add<3;k++){
+          const j=d[k].j;if(j<i)continue;
+          edges.push({a:i,b:j,
+            el:cyl(new THREE.Vector3(n.x,n.y,n.z),new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),NET_R,'#666',cell)});
+          add++;
         }
       });
     }
 
-    /* ===== colouring, propagation, secretion (exactly as previous version) ===== */
-    /* … setNodeColour, resetColours, propagatePaths, propagateDiffuse, secreteProtein … */
-    /* (They remain unchanged and work because only node positions changed.) */
+    /* === colours & propagation === */
+    function nodeCol(n,c){n.el.setAttribute('color',c);}
+    function resetColours(base='#666'){
+      nodes.forEach(n=>{
+        let c=base;
+        if(n.type==='start')c='#0000ff';
+        else if(n.type==='gene')c='#00ff00';
+        nodeCol(n,c);
+      });
+      edges.forEach(e=>e.el.setAttribute('color',base));
+    }
+    function clearTimers(){timers.forEach(clearTimeout);timers.length=0;}
 
-    /* ===== lifecycle ===== */
-    document.querySelector('a-scene').addEventListener('loaded',()=>{
-      loader.style.display='none';
-      buildNetwork();
-    });
+    function propagatePaths(){
+      clearTimers(); resetColours('#888');
+      const adj=Array(nodes.length).fill().map(()=>[]);
+      const edgeMap=new Map();
+      edges.forEach((e,i)=>{
+        adj[e.a].push(e.b);adj[e.b].push(e.a);
+        edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);
+      });
+      const prev=Array(nodes.length).fill(-1),dist=Array(nodes.length).fill(Infinity),q=[0];dist[0]=0;let found=0;
+      while(q.length&&found<geneIdx.length){
+        const u=q.shift();
+        adj[u].forEach(v=>{
+          if(dist[v]!==Infinity)return;
+          prev[v]=u;dist[v]=dist[u]+1;q.push(v);
+          if(geneIdx.includes(v))found++;});
+      }
+      const pNodes=new Set([0]),pEdges=new Set();
+      geneIdx.forEach(ep=>{
+        for(let u=ep;u!==0&&u!==-1;u=prev[u]){
+          pNodes.add(u);
+          const k=`${Math.min(u,prev[u])}-${Math.max(u,prev[u])}`;
+          if(edgeMap.has(k))pEdges.add(edgeMap.get(k));
+        }
+      });
+      const pDist={},visit=[0];pNodes.forEach(i=>pDist[i]=Infinity);pDist[0]=0;
+      while(visit.length){
+        const u=visit.shift();
+        adj[u].forEach(v=>{
+          if(!pNodes.has(v)||pDist[v]!==Infinity)return;
+          if(pEdges.has(edgeMap.get(`${Math.min(u,v)}-${Math.max(u,v)}`))){
+            pDist[v]=pDist[u]+1;visit.push(v);
+          }
+        });
+      }
+      const max=Math.max(...Object.values(pDist));
+      for(let s=0;s<=max;s++){
+        timers.push(setTimeout(()=>{
+          Object.entries(pDist).forEach(([i,d])=>{if(d===s)nodeCol(nodes[i],'#ff0000');});
+          pEdges.forEach(ei=>{
+            const e=edges[ei];
+            if(pDist[e.a]<=s&&pDist[e.b]<=s)e.el.setAttribute('color','#ff0000');
+          });
+        },s*PROP_INTERVAL));
+      }
+    }
+    function propagateDiffuse(){
+      clearTimers(); resetColours('#888');
+      const visited=new Set([0]),waves=[[0]];
+      while(waves[waves.length-1].length){
+        const next=[];
+        waves[waves.length-1].forEach(i=>{
+          edges.forEach(e=>{
+            const nb=e.a===i?e.b:e.b===i?e.a:null;
+            if(nb!==null&&!visited.has(nb)){visited.add(nb);next.push(nb);}
+          });
+        });
+        if(next.length)waves.push(next);else break;
+      }
+      waves.forEach((wave,w)=>{
+        timers.push(setTimeout(()=>{
+          wave.forEach(i=>nodeCol(nodes[i],'#ff0000'));
+          edges.forEach(e=>{
+            const ca=nodes[e.a].el.getAttribute('color'),cb=nodes[e.b].el.getAttribute('color');
+            if(ca==='#ff0000'&&cb==='#ff0000')e.el.setAttribute('color','#ff0000');
+          });
+        },w*PROP_INTERVAL));
+      });
+    }
+
+    /* === bacterium secretion === */
+    function secreteProtein(){
+      const id=`prot-${secreted++}`;
+      cell.insertAdjacentHTML('beforeend',
+        `<a-sphere id="${id}" radius="0.04" color="#ff00ff" position="0 4 0"
+                   animation="property:position;to:0 0.9 0;dur:2500;linear;fill:forwards"></a-sphere>`);
+    }
+
+    /* === lifecycle === */
+    document.querySelector('a-scene').addEventListener('loaded',()=>{loader.style.display='none';buildNetwork();});
     marker.addEventListener('markerFound',()=>{
-      cell.setAttribute('visible',true);
-      statusTxt.textContent='Success';
-      pathBtn.style.display=diffuseBtn.style.display=secreteBtn.style.display='block';
+      cell.setAttribute('visible',true); statusTxt.textContent='Success';
+      Object.values(buttons).filter(b=>b.id!=='resetBtn'&&b.id!=='zoomInBtn'&&b.id!=='zoomOutBtn')
+                            .forEach(b=>b.style.display='block');
     });
     marker.addEventListener('markerLost',()=>{
-      cell.setAttribute('visible',false);
-      statusTxt.textContent='Searching…';
-      pathBtn.style.display=diffuseBtn.style.display=secreteBtn.style.display='none';
-      resetNetwork();
+      cell.setAttribute('visible',false);statusTxt.textContent='Searching…';
+      Object.values(buttons).filter(b=>b.id!=='resetBtn'&&b.id!=='zoomInBtn'&&b.id!=='zoomOutBtn')
+                            .forEach(b=>b.style.display='none');
+      clearTimers();resetColours();
     });
 
-    /* button wiring */
-    pathBtn.onclick    =()=>propagatePaths();
-    diffuseBtn.onclick =()=>propagateDiffuse();
-    secreteBtn.onclick =()=>secreteProtein();
-    resetBtn.onclick   =()=>{buildNetwork();};
+    /* button clicks */
+    buttons.pathBtn.onclick    =()=>propagatePaths();
+    buttons.diffuseBtn.onclick =()=>propagateDiffuse();
+    buttons.secreteBtn.onclick =()=>secreteProtein();
+    buttons.resetBtn.onclick   =()=>{clearTimers();buildNetwork();};
+    buttons.zoomInBtn.onclick  =()=>setCellScale(curScale*1.2);
+    buttons.zoomOutBtn.onclick =()=>setCellScale(curScale/1.2);
   </script>
 </body>
 </html>
