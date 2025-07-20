@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>3D Network Model with Orbit Controls</title>
+  <title>3D Network Model with Cube GLB</title>
 
   <!-- A-Frame core -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
@@ -24,11 +24,7 @@
       cursor: pointer;
       z-index: 1000;
     }
-    .btn:disabled {
-      background: #555;
-      color: #999;
-      cursor: not-allowed;
-    }
+    .btn:disabled { background: #555; color: #999; cursor: not-allowed; }
     #resetBtn          { bottom: 12px; left: 12px; }
     #secretePathBtn    { bottom: 12px; right: 12px; }
     #secreteDiffuseBtn { bottom: 56px; right: 12px; }
@@ -36,8 +32,8 @@
     #zoomOutBtn        { bottom: 12px; left: calc(50% + 2px); }
   </style>
 </head>
-
 <body>
+  <!-- Controls -->
   <button id="resetBtn"          class="btn">Reset</button>
   <button id="secretePathBtn"    class="btn">Secrete & Path</button>
   <button id="secreteDiffuseBtn" class="btn">Secrete & Diffuse</button>
@@ -45,172 +41,146 @@
   <button id="zoomOutBtn"        class="btn">－</button>
 
   <a-scene background="color: #000">
-    <!-- Camera with built-in orbit controls -->
+    <!-- Camera + Orbit Controls -->
     <a-entity
       id="cam"
       camera
       position="0 0 5"
-      orbit-controls="target: 0 0 0; enableDamping: true; dampingFactor: 0.125; rotateSpeed:0.3; autoRotate: false;">
+      orbit-controls="
+        target: 0 0 0;
+        enableDamping: true;
+        dampingFactor: 0.125;
+        rotateSpeed: 0.3;
+        zoomSpeed: 1.2;
+        minDistance: 2;
+        maxDistance: 20;">
     </a-entity>
 
-    <!-- Lights -->
+    <!-- Lighting -->
     <a-entity light="type: ambient; color: #555"></a-entity>
     <a-entity light="type: directional; intensity: 0.6" position="1 1 1"></a-entity>
 
-    <!-- Root entity for the cell/network -->
-    <a-entity id="cell" visible="false" scale="2 2 2"></a-entity>
+    <!-- Your cube model + network container -->
+    <a-entity
+      id="cell"
+      visible="false"
+      scale="2 2 2"
+      gltf-model="url(path/to/your_cube_model.glb)">
+    </a-entity>
   </a-scene>
 
   <script>
-    // ======== Handles & Constants ========
+    // === Handles & Constants ===
     const cell              = document.getElementById('cell'),
+          cam               = document.getElementById('cam'),
           resetBtn          = document.getElementById('resetBtn'),
           secretePathBtn    = document.getElementById('secretePathBtn'),
           secreteDiffuseBtn = document.getElementById('secreteDiffuseBtn'),
           zoomInBtn         = document.getElementById('zoomInBtn'),
           zoomOutBtn        = document.getElementById('zoomOutBtn');
 
-    const N_NODES       = 150,
-          N_ENDPOINTS   = 4,
-          PROP_INTERVAL = 900,
-          NETWORK_RADIUS = 0.006,
-          CUBE_RADIUS    = 0.02,
-          SCALE_MIN      = 1,
-          SCALE_MAX      = 10;
+    const N_NODES        = 150,
+          N_ENDPOINTS    = 4,
+          PROP_INTERVAL  = 900,
+          NETWORK_RADIUS = 0.006;
 
-    let currentScale   = 4,
-        secretedCount  = 0;
+    let currentScale  = 2,
+        secretedCount = 0;
 
     const nodes = [], edges = [], endpointIdx = [], timers = [];
 
-    // ======== Zoom helpers ========
-    function setCellScale(s) {
-      currentScale = Math.min(Math.max(s, SCALE_MIN), SCALE_MAX);
-      cell.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
+    // === Zoom Buttons (adjust camera distance) ===
+    function zoomCamera(factor) {
+      const pos = cam.getAttribute('position');
+      // multiply z-distance
+      cam.setAttribute('position', {
+        x: pos.x,
+        y: pos.y,
+        z: THREE.MathUtils.clamp(pos.z * factor, 2, 20)
+      });
     }
-    zoomInBtn.onclick  = () => setCellScale(currentScale * 1.2);
-    zoomOutBtn.onclick = () => setCellScale(currentScale / 1.2);
+    zoomInBtn.onclick  = () => zoomCamera(0.8);
+    zoomOutBtn.onclick = () => zoomCamera(1.2);
 
-    // ======== Cylinder helper ========
-    function addCylinder(aVec, bVec, radius, color, parent) {
-      const mid = aVec.clone().add(bVec).multiplyScalar(0.5);
-      const len = aVec.distanceTo(bVec);
-      const id  = `cyl-${Math.random().toString(36).slice(2)}`;
-      parent.insertAdjacentHTML('beforeend',
-        `<a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
-                    radius="${radius}" height="${len}" color="${color}"
-                    material="opacity:0.7;shader:flat"></a-cylinder>`);
-      document.getElementById(id).object3D.quaternion.setFromUnitVectors(
-        new THREE.Vector3(0,1,0),
-        bVec.clone().sub(aVec).normalize()
-      );
-      return id;
-    }
-
-    // ======== Organelles (cube, nucleus, DNA, bacterium) ========
-    function addOrganelles() {
-      const h = 0.8;
-      const frame = [
-        [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
-        [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
-        [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
-        [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
-        [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
-        [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]
-      ];
-      frame.forEach(p => addCylinder(
-        new THREE.Vector3(...p[0]),
-        new THREE.Vector3(...p[1]),
-        CUBE_RADIUS, '#444444', cell
-      ));
-
-      const nY = -0.55;
-      cell.insertAdjacentHTML('beforeend',
-        `<a-sphere radius="0.25" position="0 ${nY} 0"
-                   material="color:#FFA500;opacity:0.2;transparent:true;side:double"></a-sphere>
-         <a-sphere radius="0.28" position="0 ${nY} 0"
-                   material="color:#FFDAB9;opacity:0.1;transparent:true;side:double"></a-sphere>
-         <a-gltf-model src="https://cdn.glitch.global/60126742-7663-452f-915f-363e77f525ab/dna_molecule.glb?v=1680012945899"
-                       scale="0.25 0.25 0.25" position="0 ${nY} 0" rotation="0 45 0"></a-gltf-model>
-         <a-cylinder id="bacterium" radius="0.12" height="0.36"
-                     color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>`
-      );
-    }
-
-    // ======== Network generation ========
+    // === Network generation & helpers ===
     const rnd = (a,b) => Math.random()*(b-a)+a;
-
     function buildNetwork() {
-      cell.innerHTML = '';
+      // clear any old children (but keep the model)
+      Array.from(cell.children)
+        .filter(el => !el.hasAttribute('gltf-model'))
+        .forEach(el => el.remove());
       nodes.length = edges.length = endpointIdx.length = 0;
-      addOrganelles();
 
-      // Star at top
-      nodes.push({id:'n0', x:0, y:0.9, z:0, type:'star'});
-
-      // Endpoints along DNA helix
-      const centre = {x:0, y:-0.55, z:0},
-            dnaRadius = 0.15, dnaHeight = 0.5;
+      // star node at top of cube
+      nodes.push({id:'n0', x:0, y:1, z:0, type:'star'});
+      // endpoints around center
       for(let i=0;i<N_ENDPOINTS;i++){
-        const angle = (i/(N_ENDPOINTS-1))*Math.PI*3;
-        const yOff = (i/(N_ENDPOINTS-1))*dnaHeight - (dnaHeight/2);
-        const x = dnaRadius*Math.cos(angle),
-              y = centre.y + yOff,
-              z = dnaRadius*Math.sin(angle);
+        const angle = (i/(N_ENDPOINTS-1))*Math.PI*2;
+        const x = 0.5 * Math.cos(angle),
+              y = -0.5 + (i/(N_ENDPOINTS-1)) * 1.0,
+              z = 0.5 * Math.sin(angle);
         endpointIdx.push(nodes.length);
         nodes.push({id:`n${nodes.length}`, x,y,z, type:'endpoint'});
       }
-
-      // Random sphere nodes
+      // random nodes inside
       while(nodes.length < N_NODES){
-        const x=rnd(-0.6,0.6), y=rnd(-0.6,0.6), z=rnd(-0.6,0.6);
-        if(Math.hypot(x-centre.x,y-centre.y,z-centre.z) < 0.3) continue;
-        nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
+        const x=rnd(-0.8,0.8), y=rnd(-0.8,0.8), z=rnd(-0.8,0.8);
+        if(Math.hypot(x,y,z) < 0.2) continue;
+        nodes.push({id:`n${nodes.length}`, x,y,z, type:'sphere'});
       }
-
-      // Create A-Frame spheres
+      // place spheres
       nodes.forEach(n=>{
         const r = n.type==='sphere'?0.04:0.06;
         const c = n.type==='star'   ? '#0000ff'
                 : n.type==='endpoint'? '#00ff00'
                                       : '#BBBBBB';
-        cell.insertAdjacentHTML('beforeend',
-          `<a-sphere id="${n.id}" radius="${r}" color="${c}"
-                     position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
-        n.el = document.getElementById(n.id);
+        const sph = document.createElement('a-sphere');
+        sph.setAttribute('id', n.id);
+        sph.setAttribute('radius', r);
+        sph.setAttribute('color', c);
+        sph.setAttribute('position', `${n.x} ${n.y} ${n.z}`);
+        cell.appendChild(sph);
+        n.el = sph;
       });
-
-      // Connect nearest neighbours with cylinders
+      // connect neighbours
+      const THREEvec = THREE.Vector3;
       nodes.forEach((n,i)=>{
-        const dists = nodes.map((m,j)=>({j, dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
-                           .sort((a,b)=>a.dist - b.dist);
+        const dists = nodes.map((m,j)=>({j, d:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+                           .sort((a,b)=>a.d-b.d);
         let added=0;
-        for(let k=1; k<dists.length && added<3; k++){
-          const j = dists[k].j;
-          if(j < i) continue;
-          addCylinder(
-            new THREE.Vector3(n.x,n.y,n.z),
-            new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
-            NETWORK_RADIUS, '#AAAAAA', cell
+        for(let k=1;k<dists.length&&added<3;k++){
+          const j=dists[k].j; if(j<i) continue;
+          const aVec = new THREEvec(n.x,n.y,n.z);
+          const bVec = new THREEvec(nodes[j].x,nodes[j].y,nodes[j].z);
+          const cylId = `cyl-${Math.random().toString(36).slice(2)}`;
+          cell.insertAdjacentHTML('beforeend',
+            `<a-cylinder id="${cylId}"
+                         radius="${NETWORK_RADIUS}"
+                         height="${aVec.distanceTo(bVec)}"
+                         color="#AAAAAA"
+                         position="${aVec.clone().add(bVec).multiplyScalar(0.5).toArray().join(' ')}"
+                         material="opacity:0.7;shader:flat"></a-cylinder>`);
+          const cyl = document.getElementById(cylId);
+          cyl.object3D.quaternion.setFromUnitVectors(
+            new THREE.Vector3(0,1,0),
+            bVec.clone().sub(aVec).normalize()
           );
-          edges.push({a:i, b:j, el: cell.lastElementChild});
+          edges.push({a:i, b:j, el:cyl});
           added++;
         }
       });
     }
 
-    // ======== Colour & Reset helpers ========
-    function setNodeColour(n,c) { n.el.setAttribute('color', c); }
-    function resetColours(base='#AAAAAA') {
+    function resetColours(base='#AAAAAA'){
       nodes.forEach(n=>{
-        let c=base;
+        let c = base;
         if(n.type==='star')      c='#0000ff';
         else if(n.type==='endpoint') c='#00ff00';
-        setNodeColour(n,c);
+        n.el.setAttribute('color', c);
       });
-      edges.forEach(e=> e.el.setAttribute('color', base));
+      edges.forEach(e=>e.el.setAttribute('color', base));
     }
-    function resetNetwork() {
+    function resetNetwork(){
       timers.forEach(clearTimeout);
       timers.length = 0;
       resetColours();
@@ -218,90 +188,74 @@
       document.querySelectorAll('[id^="prot-"]').forEach(p=>p.remove());
     }
 
-    // ======== Propagation algorithms ========
+    // === Propagation & Secretion ===
     function propagatePaths(){
       resetNetwork();
-      // build adjacency
       const adj = Array(nodes.length).fill().map(()=>[]);
       const edgeMap = new Map();
       edges.forEach((e,i)=>{
-        adj[e.a].push(e.b);
-        adj[e.b].push(e.a);
+        adj[e.a].push(e.b); adj[e.b].push(e.a);
         edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`, i);
       });
-
-      // BFS to endpoints
       const prev = Array(nodes.length).fill(-1),
             dist = Array(nodes.length).fill(Infinity),
-            queue = [0];
-      dist[0]=0;
-      let found=0;
-      while(queue.length && found<endpointIdx.length){
-        const u = queue.shift();
+            q = [0];
+      dist[0]=0; let found=0;
+      while(q.length && found<endpointIdx.length){
+        const u = q.shift();
         adj[u].forEach(v=>{
-          if(dist[v] !== Infinity) return;
-          dist[v] = dist[u] + 1;
-          prev[v] = u;
-          queue.push(v);
+          if(dist[v]!==Infinity) return;
+          dist[v] = dist[u]+1; prev[v]=u; q.push(v);
           if(endpointIdx.includes(v)) found++;
         });
       }
-
-      // collect path nodes & edges
-      const pathNodes = new Set([0]),
-            pathEdges = new Set();
+      const pathNodes = new Set([0]), pathEdges = new Set();
       endpointIdx.forEach(ep=>{
         for(let u=ep; u!==0 && u!==-1; u=prev[u]){
           pathNodes.add(u);
-          const key = `${Math.min(u,prev[u])}-${Math.max(u,prev[u])}`;
+          const key=`${Math.min(u,prev[u])}-${Math.max(u,prev[u])}`;
           if(edgeMap.has(key)) pathEdges.add(edgeMap.get(key));
         }
       });
-
-      // measure distances along path
       const pathDist = {}, visit=[0];
-      pathNodes.forEach(i=> pathDist[i]=Infinity);
+      pathNodes.forEach(i=>pathDist[i]=Infinity);
       pathDist[0]=0;
       while(visit.length){
-        const u = visit.shift();
+        const u=visit.shift();
         adj[u].forEach(v=>{
-          if(!pathNodes.has(v) || pathDist[v]!==Infinity) return;
-          const k = `${Math.min(u,v)}-${Math.max(u,v)}`;
+          if(!pathNodes.has(v)||pathDist[v]!==Infinity) return;
+          const k=`${Math.min(u,v)}-${Math.max(u,v)}`;
           if(pathEdges.has(edgeMap.get(k))){
-            pathDist[v] = pathDist[u] + 1;
+            pathDist[v]=pathDist[u]+1;
             visit.push(v);
           }
         });
       }
-
-      // animate
       const maxStep = Math.max(...Object.values(pathDist));
       for(let s=0; s<=maxStep; s++){
         timers.push(setTimeout(()=>{
           Object.entries(pathDist).forEach(([i,d])=>{
-            if(d===s) setNodeColour(nodes[i],'#ff0000');
+            if(d===s) nodes[i].el.setAttribute('color','#ff0000');
           });
           pathEdges.forEach(ei=>{
             const e = edges[ei];
-            if(pathDist[e.a]<=s && pathDist[e.b]<=s){
+            if(pathDist[e.a]<=s && pathDist[e.b]<=s)
               e.el.setAttribute('color','#ff0000');
-            }
           });
-        }, s * PROP_INTERVAL));
+        }, s*PROP_INTERVAL));
       }
     }
 
     function propagateDiffuse(){
       resetNetwork();
-      const visited = new Set([0]), waves=[[0]];
+      const visited=new Set([0]), waves=[[0]];
       while(waves[waves.length-1].length){
         const next=[];
         waves[waves.length-1].forEach(i=>{
           edges.forEach(e=>{
-            const nb = e.a===i? e.b : e.b===i? e.a : null;
+            const nb = e.a===i ? e.b : e.b===i ? e.a : null;
             if(nb!==null && !visited.has(nb)){
-              visited.add(nb);
-              next.push(nb);
+              visited.add(nb); next.push(nb);
             }
           });
         });
@@ -310,49 +264,42 @@
       }
       waves.forEach((wave,w)=>{
         timers.push(setTimeout(()=>{
-          wave.forEach(i=> setNodeColour(nodes[i],'#ff0000'));
+          wave.forEach(i=>nodes[i].el.setAttribute('color','#ff0000'));
           edges.forEach(e=>{
-            const ca = nodes[e.a].el.getAttribute('color'),
-                  cb = nodes[e.b].el.getAttribute('color');
-            if(ca==='#ff0000' && cb==='#ff0000'){
-              e.el.setAttribute('color','#ff0000');
-            }
+            const ca=nodes[e.a].el.getAttribute('color'),
+                  cb=nodes[e.b].el.getAttribute('color');
+            if(ca==='#ff0000' && cb==='#ff0000') e.el.setAttribute('color','#ff0000');
           });
-        }, w * PROP_INTERVAL));
+        }, w*PROP_INTERVAL));
       });
     }
 
-    // ======== Bacterium secretion ========
     function secreteProtein(){
-      const id = `prot-${secretedCount++}`,
-            startX = 1.2, startY = 1.0, endY = 0.9;
+      const id = `prot-${secretedCount++}`;
       cell.insertAdjacentHTML('beforeend',
         `<a-sphere id="${id}" radius="0.04" color="#ff00ff"
-                   position="${startX} ${startY} 0"
+                   position="1 1 0"
                    animation="property: position;
-                              to: 0 ${endY} 0;
+                              to: 0 -0.5 0;
                               dur: 2500;
                               easing: linear;
                               fill: forwards"></a-sphere>`);
     }
 
-    // ======== Lifecycle & event wiring ========
-    document.querySelector('a-scene').addEventListener('loaded', () => {
+    // === Init & Event Wiring ===
+    document.querySelector('a-scene').addEventListener('loaded', ()=>{
       cell.setAttribute('visible', true);
       buildNetwork();
     });
-
-    resetBtn.onclick = () => resetNetwork();
-    secretePathBtn.onclick = () => {
+    resetBtn.onclick = resetNetwork;
+    secretePathBtn.onclick = ()=>{
       secreteProtein();
-      secretePathBtn.disabled = true;
-      secreteDiffuseBtn.disabled = true;
+      secretePathBtn.disabled = secreteDiffuseBtn.disabled = true;
       timers.push(setTimeout(propagatePaths, 2500));
     };
-    secreteDiffuseBtn.onclick = () => {
+    secreteDiffuseBtn.onclick = ()=>{
       secreteProtein();
-      secretePathBtn.disabled = true;
-      secreteDiffuseBtn.disabled = true;
+      secretePathBtn.disabled = secreteDiffuseBtn.disabled = true;
       timers.push(setTimeout(propagateDiffuse, 2500));
     };
   </script>
