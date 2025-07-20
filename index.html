@@ -2,115 +2,92 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>3D Network Model – Drag & Orbit</title>
+  <title>3D Cube-Network (drag-rotate + zoom)</title>
 
   <!-- A-Frame core -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- Orbit-controls component -->
+  <!-- orbit-controls (for wheel / pinch zoom) -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-orbit-controls-component@1.3.0/dist/aframe-orbit-controls.min.js"></script>
 
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body { margin: 0; overflow: hidden; font-family: monospace; }
-    .btn {
-      position: fixed; padding: 6px 12px; font:16px monospace;
-      background:#222; color:#fff; border:1px solid #888; border-radius:4px;
-      opacity:.85; cursor:pointer; z-index:1000;
-    }
-    .btn:disabled { background:#555; color:#999; cursor:not-allowed; }
-    #resetBtn          { bottom:12px; left:12px; }
-    #secretePathBtn    { bottom:12px; right:12px; }
-    #secreteDiffuseBtn { bottom:56px; right:12px; }
-    #zoomInBtn         { bottom:12px; left:calc(50% - 34px); }
-    #zoomOutBtn        { bottom:12px; left:calc(50% + 2px); }
+    body {margin:0;overflow:hidden;font-family:monospace}
+    .btn{
+      position:fixed;padding:6px 12px;font:16px monospace;
+      background:#222;color:#fff;border:1px solid #888;border-radius:4px;
+      opacity:.85;cursor:pointer;z-index:1000}
+    .btn:disabled{background:#555;color:#999;cursor:not-allowed}
+    #resetBtn          {bottom:12px;left:12px}
+    #secretePathBtn    {bottom:12px;right:12px}
+    #secreteDiffuseBtn {bottom:56px;right:12px}
+    #zoomInBtn         {bottom:12px;left:calc(50% - 34px)}
+    #zoomOutBtn        {bottom:12px;left:calc(50% + 2px)}
   </style>
-
-  <!-- Drag‑rotate component (for spinning the cube itself) -->
-  <script>
-    AFRAME.registerComponent('drag-rotate', {
-      schema: { speed: { default: 1 } },
-      init: function () {
-        this.dragging = false;
-        let lastX, lastY;
-        const el = this.el;
-        const canvas = this.el.sceneEl.canvas;
-
-        const startDrag = e => {
-          this.dragging = true;
-          lastX = e.clientX;
-          lastY = e.clientY;
-        };
-        const endDrag = () => { this.dragging = false; };
-        const doDrag = e => {
-          if (!this.dragging) return;
-          const dx = e.clientX - lastX;
-          const dy = e.clientY - lastY;
-          const rot = el.getAttribute('rotation');
-          el.setAttribute('rotation', {
-            x: rot.x + dy * this.data.speed,
-            y: rot.y + dx * this.data.speed,
-            z: rot.z
-          });
-          lastX = e.clientX; lastY = e.clientY;
-        };
-
-        canvas.addEventListener('mousedown', startDrag);
-        window.addEventListener('mouseup', endDrag);
-        window.addEventListener('mousemove', doDrag);
-
-        // touch support
-        canvas.addEventListener('touchstart', e => { startDrag(e.touches[0]); }, { passive: false });
-        canvas.addEventListener('touchmove', e => {
-          e.preventDefault();
-          doDrag(e.touches[0]);
-        }, { passive: false });
-        canvas.addEventListener('touchend', endDrag);
-      }
-    });
-  </script>
 </head>
 <body>
-  <!-- Buttons -->
+  <!-- UI buttons -->
   <button id="resetBtn"          class="btn">Reset</button>
   <button id="secretePathBtn"    class="btn">Secrete & Path</button>
   <button id="secreteDiffuseBtn" class="btn">Secrete & Diffuse</button>
   <button id="zoomInBtn"         class="btn">＋</button>
   <button id="zoomOutBtn"        class="btn">－</button>
 
-  <a-scene background="color: #000">
-    <!-- Camera with orbit-controls -->
-    <a-entity
-      id="cam"
-      camera
-      position="0 0 5"
-      orbit-controls="
-        target: 0 0 0;
-        enableDamping: true;
-        dampingFactor: 0.125;
-        rotateSpeed: 0.3;
-        zoomSpeed: 1.2;
-        minDistance: 2;
-        maxDistance: 20;
-        enableZoom: true;
-        enablePan: false;">
+  <a-scene background="color:#000">
+    <!-- camera (orbit-controls gives us wheel / pinch zoom) -->
+    <a-entity id="cam"
+              camera
+              look-controls="enabled:false"     <!-- disable pointer-lock view -->
+              orbit-controls="target: 0 0 0;    /* stays centred on cube   */
+                              enableDamping: true;
+                              dampingFactor: 0.1;
+                              zoomSpeed: 1.2;
+                              minDistance: 2;
+                              maxDistance: 20;"
+              position="0 0 5">
     </a-entity>
 
-    <!-- Lights -->
-    <a-entity light="type: ambient; color: #555"></a-entity>
-    <a-entity light="type: directional; intensity: 0.6" position="1 1 1"></a-entity>
+    <!-- lights -->
+    <a-entity light="type:ambient;color:#555"></a-entity>
+    <a-entity light="type:directional;intensity:0.6" position="1 1 1"></a-entity>
 
-    <!-- Your cube model: drag-rotate lets you spin it directly -->
-    <a-entity
-      id="cell"
-      visible="false"
-      scale="2 2 2"
-      drag-rotate
-      gltf-model="url(path/to/your_cube_model.glb)">
+    <!-- the cube model + network parents -->
+    <a-entity id="cell"
+              gltf-model="url(path/to/your_cube_model.glb)"
+              visible="false"
+              scale="2 2 2"
+              drag-rotate>
     </a-entity>
   </a-scene>
 
+  <!-- DRAG-ROTATE COMPONENT -->
   <script>
-    // ======== Handles & Constants ========
+    AFRAME.registerComponent('drag-rotate',{
+      schema:{speed:{default:1}},
+      init(){
+        const cvs=this.el.sceneEl.canvas;
+        let dragging=false, px=0, py=0;
+        const start=e=>{dragging=true;px=e.clientX;py=e.clientY;};
+        const move=(x,y,f=1)=>{
+          if(!dragging) return;
+          const r=this.el.getAttribute('rotation');
+          this.el.setAttribute('rotation',{
+            x:r.x+(y-py)*f*this.data.speed,
+            y:r.y+(x-px)*f*this.data.speed,
+            z:r.z});
+          px=x;py=y;
+        };
+        cvs.addEventListener('mousedown',e=>start(e));
+        window.addEventListener('mousemove',e=>move(e.clientX,e.clientY));
+        window.addEventListener('mouseup',()=>dragging=false);
+        cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
+        window.addEventListener('touchmove',e=>{
+          if(dragging){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},{passive:false});
+        window.addEventListener('touchend',()=>dragging=false);
+      }});
+  </script>
+
+  <script>
+    /* ========= handles & constants ========= */
     const cell              = document.getElementById('cell'),
           cam               = document.getElementById('cam'),
           resetBtn          = document.getElementById('resetBtn'),
@@ -119,133 +96,221 @@
           zoomInBtn         = document.getElementById('zoomInBtn'),
           zoomOutBtn        = document.getElementById('zoomOutBtn');
 
-    const N_NODES        = 150,
-          N_ENDPOINTS    = 4,
-          PROP_INTERVAL  = 900,
-          NETWORK_RADIUS = 0.006;
+    const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
+          NETWORK_RADIUS=0.006;
+    let secretedCount=0;
+    const nodes=[],edges=[],endpointIdx=[],timers=[];
 
-    let secretedCount = 0,
-        nodes = [], edges = [], endpointIdx = [], timers = [];
-
-    // ======== Zoom Buttons (adjust camera distance) ========
-    function zoomCamera(factor) {
-      const pos = cam.getAttribute('position');
-      cam.setAttribute('position', {
-        x: pos.x,
-        y: pos.y,
-        z: THREE.MathUtils.clamp(pos.z * factor, 2, 20)
-      });
+    /* ========= zoom helpers (scale cube, not camera) ========= */
+    function scaleCube(f){
+      const s = cell.object3D.scale.x * f;
+      const clamped = THREE.MathUtils.clamp(s,0.5,8);
+      cell.setAttribute('scale',`${clamped} ${clamped} ${clamped}`);
     }
-    zoomInBtn.onclick  = () => zoomCamera(0.8);
-    zoomOutBtn.onclick = () => zoomCamera(1.2);
+    zoomInBtn.onclick  = ()=>scaleCube(1.2);
+    zoomOutBtn.onclick = ()=>scaleCube(1/1.2);
+    /* wheel / pinch zoom handled by orbit-controls on the camera */
 
-    // ======== Network generation ========
-    const rnd = (a,b) => Math.random()*(b-a)+a;
-    function buildNetwork() {
-      // clear old decorations (keep the glTF mesh)
+    /* ========= cylinder helper ========= */
+    function addCylinder(aVec,bVec,radius,color,parent){
+      const mid=aVec.clone().add(bVec).multiplyScalar(0.5);
+      const len=aVec.distanceTo(bVec);
+      const id=`cyl-${Math.random().toString(36).slice(2)}`;
+      parent.insertAdjacentHTML('beforeend',
+        `<a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
+                     radius="${radius}" height="${len}" color="${color}"
+                     material="opacity:0.7;shader:flat"></a-cylinder>`);
+      document.getElementById(id).object3D.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0,1,0),
+        bVec.clone().sub(aVec).normalize());
+      return id;
+    }
+
+    /* ========= network generation ========= */
+    const rnd=(a,b)=>Math.random()*(b-a)+a;
+
+    function buildNetwork(){
+      /* remove any previous spheres / cylinders (keep the GLB) */
       Array.from(cell.children)
-        .filter(el => !el.hasAttribute('gltf-model'))
-        .forEach(el => el.remove());
-      nodes = []; edges = []; endpointIdx = []; timers = [];
+        .filter(el=>!el.hasAttribute('gltf-model'))
+        .forEach(el=>el.remove());
+      nodes.length=edges.length=endpointIdx.length=0;
 
-      // star node at top
-      nodes.push({id:'n0', x:0, y:1, z:0, type:'star'});
-      // endpoints around inside
+      /* star node at cube top */
+      nodes.push({id:'n0',x:0,y:1,z:0,type:'star'});
+
+      /* endpoints spiralling round cube centre */
       for(let i=0;i<N_ENDPOINTS;i++){
-        const angle = (i/(N_ENDPOINTS-1))*Math.PI*2;
-        const x = 0.5*Math.cos(angle),
-              y = -0.5 + (i/(N_ENDPOINTS-1))*1.0,
-              z = 0.5*Math.sin(angle);
-        endpointIdx.push(nodes.length);
-        nodes.push({id:`n${nodes.length}`, x,y,z, type:'endpoint'});
-      }
-      // random nodes
-      while(nodes.length < N_NODES){
-        const x=rnd(-0.8,0.8), y=rnd(-0.8,0.8), z=rnd(-0.8,0.8);
-        if(Math.hypot(x,y,z) < 0.2) continue;
-        nodes.push({id:`n${nodes.length}`, x,y,z, type:'sphere'});
+        const t=i/(N_ENDPOINTS-1);
+        const angle=t*Math.PI*2;
+        nodes.push({
+          id:`n${nodes.length}`,
+          x:0.5*Math.cos(angle),
+          y:-0.5+ t*1.0,
+          z:0.5*Math.sin(angle),
+          type:'endpoint'});
+        endpointIdx.push(nodes.length-1);
       }
 
-      // spheres
+      /* random nodes */
+      while(nodes.length<N_NODES){
+        const x=rnd(-0.8,0.8),y=rnd(-0.8,0.8),z=rnd(-0.8,0.8);
+        if(Math.hypot(x,y,z)<0.25) continue;
+        nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
+      }
+
+      /* spheres */
       nodes.forEach(n=>{
-        const r = n.type==='sphere'?0.04:0.06;
-        const c = n.type==='star'   ? '#0000ff'
-                : n.type==='endpoint'? '#00ff00'
-                                      : '#BBBBBB';
-        const sph = document.createElement('a-sphere');
-        sph.setAttribute('id', n.id);
-        sph.setAttribute('radius', r);
-        sph.setAttribute('color', c);
-        sph.setAttribute('position', `${n.x} ${n.y} ${n.z}`);
+        const r=n.type==='sphere'?0.04:0.06;
+        const c=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#BBBBBB';
+        const sph=document.createElement('a-sphere');
+        sph.setAttribute('id',n.id);
+        sph.setAttribute('radius',r);
+        sph.setAttribute('color',c);
+        sph.setAttribute('position',`${n.x} ${n.y} ${n.z}`);
         cell.appendChild(sph);
-        n.el = sph;
+        n.el=sph;
       });
 
-      // cylinders
+      /* edges */
       nodes.forEach((n,i)=>{
-        const dists = nodes.map((m,j)=>({j, d:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
-                           .sort((a,b)=>a.d-b.d);
+        const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+                         .sort((a,b)=>a.dist-b.dist);
         let added=0;
-        for(let k=1;k<dists.length && added<3;k++){
-          const j = dists[k].j; if(j<i) continue;
-          const aVec = new THREE.Vector3(n.x,n.y,n.z);
-          const bVec = new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z);
-          const id   = `cyl-${Math.random().toString(36).slice(2)}`;
-          cell.insertAdjacentHTML('beforeend',
-            `<a-cylinder id="${id}"
-                         radius="${NETWORK_RADIUS}"
-                         height="${aVec.distanceTo(bVec)}"
-                         color="#AAAAAA"
-                         position="${aVec.clone().add(bVec).multiplyScalar(0.5).toArray().join(' ')}"
-                         material="opacity:0.7;shader:flat"></a-cylinder>`);
-          const cyl = document.getElementById(id);
-          cyl.object3D.quaternion.setFromUnitVectors(
-            new THREE.Vector3(0,1,0),
-            bVec.clone().sub(aVec).normalize()
-          );
-          edges.push({a:i,b:j,el:cyl});
+        for(let k=1;k<dists.length&&added<3;k++){
+          const j=dists[k].j;if(j<i)continue;
+          addCylinder(
+            new THREE.Vector3(n.x,n.y,n.z),
+            new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
+            NETWORK_RADIUS,'#AAAAAA',cell);
+          edges.push({a:i,b:j,el:cell.lastElementChild});
           added++;
         }
       });
     }
 
+    /* ========= colour helpers / reset ========= */
+    function setNodeColour(n,c){ n.el.setAttribute('color',c); }
     function resetColours(base='#AAAAAA'){
       nodes.forEach(n=>{
-        let c = base;
-        if(n.type==='star')       c='#0000ff';
-        else if(n.type==='endpoint') c='#00ff00';
-        n.el.setAttribute('color', c);
+        let c=base;if(n.type==='star')c='#0000ff';
+        else if(n.type==='endpoint')c='#00ff00';
+        setNodeColour(n,c);
       });
-      edges.forEach(e=>e.el.setAttribute('color', base));
+      edges.forEach(e=>e.el.setAttribute('color',base));
     }
     function resetNetwork(){
-      timers.forEach(clearTimeout);
-      timers.length=0;
+      timers.forEach(clearTimeout); timers.length=0;
       resetColours();
-      secretePathBtn.disabled = secreteDiffuseBtn.disabled = false;
+      secretePathBtn.disabled=secreteDiffuseBtn.disabled=false;
       document.querySelectorAll('[id^="prot-"]').forEach(p=>p.remove());
     }
 
-    // propagation & secretion (same logic as before)...
-    function propagatePaths(){ /* …copy your BFS code here… */ }
-    function propagateDiffuse(){ /* …copy your diffusion code here… */ }
-    function secreteProtein(){ /* …copy your secretion code here… */ }
+    /* ========= propagation algorithms (unchanged) ========= */
+    function propagatePaths(){
+      resetNetwork();
+      const adj=Array(nodes.length).fill().map(()=>[]);
+      const edgeMap=new Map();
+      edges.forEach((e,i)=>{
+        adj[e.a].push(e.b);adj[e.b].push(e.a);
+        edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);
+      });
+      const prev=Array(nodes.length).fill(-1),
+            dist=Array(nodes.length).fill(Infinity),
+            q=[0];dist[0]=0;let found=0;
+      while(q.length&&found<endpointIdx.length){
+        const u=q.shift();
+        adj[u].forEach(v=>{
+          if(dist[v]!==Infinity)return;
+          dist[v]=dist[u]+1;prev[v]=u;q.push(v);
+          if(endpointIdx.includes(v))found++;
+        });
+      }
+      const pathNodes=new Set([0]),pathEdges=new Set();
+      endpointIdx.forEach(ep=>{
+        for(let u=ep;u!==0&&u!==-1;u=prev[u]){
+          pathNodes.add(u);
+          const k=`${Math.min(u,prev[u])}-${Math.max(u,prev[u])}`;
+          if(edgeMap.has(k))pathEdges.add(edgeMap.get(k));
+        }
+      });
+      const pathDist={},visit=[0];pathNodes.forEach(i=>pathDist[i]=Infinity);
+      pathDist[0]=0;
+      while(visit.length){
+        const u=visit.shift();
+        adj[u].forEach(v=>{
+          if(!pathNodes.has(v)||pathDist[v]!==Infinity)return;
+          const k=`${Math.min(u,v)}-${Math.max(u,v)}`;
+          if(pathEdges.has(edgeMap.get(k))){
+            pathDist[v]=pathDist[u]+1;visit.push(v);
+          }
+        });
+      }
+      const maxStep=Math.max(...Object.values(pathDist));
+      for(let s=0;s<=maxStep;s++){
+        timers.push(setTimeout(()=>{
+          Object.entries(pathDist).forEach(([i,d])=>{
+            if(d===s)setNodeColour(nodes[i],'#ff0000');
+          });
+          pathEdges.forEach(ei=>{
+            const e=edges[ei];
+            if(pathDist[e.a]<=s&&pathDist[e.b]<=s)
+              e.el.setAttribute('color','#ff0000');
+          });
+        },s*PROP_INTERVAL));
+      }
+    }
 
-    // show and build on load
+    function propagateDiffuse(){
+      resetNetwork();
+      const visited=new Set([0]),waves=[[0]];
+      while(waves[waves.length-1].length){
+        const next=[];
+        waves[waves.length-1].forEach(i=>{
+          edges.forEach(e=>{
+            const nb=e.a===i?e.b:e.b===i?e.a:null;
+            if(nb!==null&&!visited.has(nb)){visited.add(nb);next.push(nb);}
+          });
+        });
+        if(next.length)waves.push(next);else break;
+      }
+      waves.forEach((wave,w)=>{
+        timers.push(setTimeout(()=>{
+          wave.forEach(i=>setNodeColour(nodes[i],'#ff0000'));
+          edges.forEach(e=>{
+            const ca=nodes[e.a].el.getAttribute('color'),
+                  cb=nodes[e.b].el.getAttribute('color');
+            if(ca==='#ff0000'&&cb==='#ff0000')
+              e.el.setAttribute('color','#ff0000');
+          });
+        },w*PROP_INTERVAL));
+      });
+    }
+
+    /* ========= bacterium secretion ========= */
+    function secreteProtein(){
+      const id=`prot-${secretedCount++}`;
+      cell.insertAdjacentHTML('beforeend',
+        `<a-sphere id="${id}" radius="0.04" color="#ff00ff"
+                   position="1 1 0"
+                   animation="property: position; to: 0 -0.5 0; dur: 2500;
+                              easing: linear; fill: forwards"></a-sphere>`);
+    }
+
+    /* ========= life-cycle & wiring ========= */
     document.querySelector('a-scene').addEventListener('loaded',()=>{
-      cell.setAttribute('visible', true);
+      cell.setAttribute('visible',true);
       buildNetwork();
     });
-
-    resetBtn.onclick          = resetNetwork;
-    secretePathBtn.onclick    = ()=>{
+    resetBtn.onclick=resetNetwork;
+    secretePathBtn.onclick=()=>{
       secreteProtein();
-      secretePathBtn.disabled = secreteDiffuseBtn.disabled = true;
+      secretePathBtn.disabled=secreteDiffuseBtn.disabled=true;
       timers.push(setTimeout(propagatePaths,2500));
     };
-    secreteDiffuseBtn.onclick = ()=>{
+    secreteDiffuseBtn.onclick=()=>{
       secreteProtein();
-      secretePathBtn.disabled = secreteDiffuseBtn.disabled = true;
+      secretePathBtn.disabled=secreteDiffuseBtn.disabled=true;
       timers.push(setTimeout(propagateDiffuse,2500));
     };
   </script>
