@@ -5,6 +5,7 @@
   <title>Cubic cell – microbe‑host PPI demo (3D Model)</title>
 
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
     body { margin: 0; overflow: hidden; font-family: monospace; }
@@ -22,7 +23,6 @@
     }
     .btn:disabled { background: #555; color: #999; cursor: not-allowed; }
     #resetBtn          { bottom: 12px; left: 12px; }
-    /* Buttons are now visible by default */
     #secretePathBtn    { bottom: 12px; right: 12px; }
     #secreteDiffuseBtn { bottom: 56px; right: 12px; }
     #zoomInBtn         { bottom: 12px; left: calc(50% - 34px); }
@@ -58,13 +58,12 @@
   <button id="zoomOutBtn"        class="btn">－</button>
 
   <a-scene background="color: #282828">
-    <a-entity id="cell" position="0 0.5 -4" drag-rotate scale="2 2 2"></a-entity>
+    <a-entity id="cell" position="0 0.5 -7" drag-rotate scale="2 2 2"></a-entity>
     
     <a-entity camera position="0 1.6 0"></a-entity>
   </a-scene>
 
   <script>
-    // This custom component remains unchanged.
     AFRAME.registerComponent('drag-rotate', {
       schema: { speed: { default: 1 } },
       init() {
@@ -95,7 +94,6 @@
 
   <script>
     /* === handles & constants === */
-    // Removed handles for AR marker and status text
     const cell              = document.getElementById('cell'),
           loader            = document.getElementById('loader'),
           secretePathBtn    = document.getElementById('secretePathBtn'),
@@ -111,7 +109,7 @@
 
     const nodes = [], edges = [], endpointIdx = [], timers = [];
 
-    /* === zoom helpers (unchanged) === */
+    /* === zoom helpers === */
     function setCellScale(s) {
       currentScale = Math.min(Math.max(s, SCALE_MIN), SCALE_MAX);
       cell.setAttribute('scale', `${currentScale} ${currentScale} ${currentScale}`);
@@ -130,7 +128,7 @@
     }, { passive: false });
     window.addEventListener('touchend', () => pinchStart = null);
 
-    /* === cylinder helper (unchanged) === */
+    /* === cylinder helper === */
     function addCylinder(aVec, bVec, radius, color, parent) {
       const mid = aVec.clone().add(bVec).multiplyScalar(0.5);
       const len = aVec.distanceTo(bVec);
@@ -146,7 +144,7 @@
       return id;
     }
 
-    /* === cube frame, nucleus, DNA, and bacterium (unchanged) === */
+    /* === cube frame, nucleus, DNA, and bacterium === */
     function addOrganelles() {
       const h = 0.8, frame = [
         [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
@@ -172,7 +170,7 @@
                   color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>`);
     }
 
-    /* === network generation (unchanged) === */
+    /* === network generation === */
     const rnd = (a, b) => Math.random() * (b - a) + a;
     function buildNetwork() {
       cell.innerHTML = '';
@@ -180,7 +178,8 @@
       addOrganelles();
       nodes.push({ id: 'n0', x: 0, y: 0.9, z: 0, type: 'star' });
       const nC = { x: 0, y: -0.55, z: 0 };
-      const dnaRadius = 0.15, dnaHeight = 0.5;
+      // MODIFICATION 2: Reduced dimensions to fit endpoints inside the nucleus
+      const dnaRadius = 0.1, dnaHeight = 0.3;
       for (let i = 0; i < N_ENDPOINTS; i++) {
         const angle = (i / (N_ENDPOINTS - 1)) * Math.PI * 3;
         const y_offset = (i / (N_ENDPOINTS - 1)) * dnaHeight - (dnaHeight / 2);
@@ -219,7 +218,7 @@
       });
     }
 
-    /* === colour helpers (unchanged) === */
+    /* === colour helpers === */
     function setNodeColour(n, c) { n.el.setAttribute('color', c); }
     function resetColours(base = '#AAAAAA') {
       nodes.forEach(n => {
@@ -237,7 +236,7 @@
       document.querySelectorAll('[id^="prot-"]').forEach(p => p.remove());
     }
 
-    /* === propagation algorithms (unchanged) === */
+    /* === propagation algorithms === */
     function propagatePaths() {
       resetNetwork();
       const adj = Array(nodes.length).fill().map(() => []);
@@ -316,7 +315,7 @@
       });
     }
 
-    /* === bacterium secretion (unchanged) === */
+    /* === bacterium secretion === */
     function secreteProtein() {
       const id = `prot-${secretedCount++}`;
       const startX = 1.2, startY = 1.0, endY = 0.9;
@@ -327,15 +326,12 @@
     }
 
     /* === lifecycle === */
-    // The 'loaded' event now just hides the loader and builds the network.
     document.querySelector('a-scene').addEventListener('loaded', () => {
       loader.style.display = 'none';
       buildNetwork();
     });
 
-    // Removed markerFound and markerLost event listeners.
-
-    /* === button actions (unchanged) === */
+    /* === button actions === */
     secretePathBtn.onclick = () => {
       secreteProtein();
       secretePathBtn.disabled = true;
