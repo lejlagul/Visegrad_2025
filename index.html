@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <title>Cubic cell – 3‑D only</title>
+
+<!-- A‑Frame core -->
 <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
   body{margin:0;overflow:hidden;font-family:monospace;background:#000}
@@ -21,7 +24,7 @@
 </head>
 
 <body>
-  <div id="status">Ready</div>
+  <div id="status">Loading…</div>
   <button id="resetBtn"          class="btn">Reset</button>
   <button id="secretePathBtn"    class="btn">Secrete &amp; Path</button>
   <button id="secreteDiffuseBtn" class="btn">Secrete &amp; Diffuse</button>
@@ -29,20 +32,22 @@
   <button id="zoomOutBtn"        class="btn">－</button>
 
   <a-scene embedded>
-    <!-- lights -->
+    <!-- simple lights so geometry isn’t black -->
     <a-entity light="type:ambient;intensity:1"></a-entity>
     <a-entity light="type:directional;intensity:0.8" position="2 4 2"></a-entity>
 
-    <!-- the cell model, now visible from the start -->
-    <a-entity id="cell" drag-rotate scale="2 2 2"></a-entity>
+    <!-- cell root: starts visible -->
+    <a-entity id="cell" drag-rotate scale="4 4 4"></a-entity>
 
-    <!-- simple static camera aimed straight at the origin -->
-    <a-entity camera position="0 0 5"></a-entity>
+    <!-- camera aimed at origin -->
+    <a-entity camera position="0 0 5" look-controls="enabled:false"></a-entity>
   </a-scene>
 
-  <!-- drag‑rotate component (unchanged) -->
+  <!-- ───────────────── drag‑rotate component ───────────────── -->
   <script>
-  AFRAME.registerComponent('drag-rotate',{schema:{speed:{default:1}},init(){
+  AFRAME.registerComponent('drag-rotate',{
+    schema:{speed:{default:1}},
+    init(){
       const cvs=this.el.sceneEl.canvas;
       let dragging=false,px=0,py=0;
       const start=e=>{dragging=true;px=e.clientX;py=e.clientY};
@@ -57,13 +62,241 @@
       window.addEventListener('mouseup',()=>dragging=false);
       cvs.addEventListener('touchstart',e=>start(e.touches[0]),{passive:false});
       window.addEventListener('touchmove',e=>{
-        if(dragging){e.preventDefault();move(e.touches[0].clientX,e.touches[0].clientY,0.5)}},{passive:false});
+        if(dragging){e.preventDefault();
+          move(e.touches[0].clientX,e.touches[0].clientY,0.5);}},{passive:false});
       window.addEventListener('touchend',()=>dragging=false);
-  }});
+    }});
   </script>
 
-  <!-- the rest of your original network‑building, diffusion / path‑propagation,
-       zoom, secretion, and reset code goes here *unchanged* -->
-  <script src="cell‑logic.js"></script>
+  <!-- ───────────────── full logic (network, organelles, buttons) ───────────────── -->
+  <script>
+  /* === handles & constants === */
+  const cell              = document.getElementById('cell'),
+        statusTxt         = document.getElementById('status'),
+        secretePathBtn    = document.getElementById('secretePathBtn'),
+        secreteDiffuseBtn = document.getElementById('secreteDiffuseBtn'),
+        resetBtn          = document.getElementById('resetBtn'),
+        zoomInBtn         = document.getElementById('zoomInBtn'),
+        zoomOutBtn        = document.getElementById('zoomOutBtn');
+
+  const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
+        NETWORK_RADIUS=0.006, CUBE_RADIUS=0.02,
+        SCALE_MIN=1, SCALE_MAX=10;
+  let currentScale=4, secretedCount=0;
+
+  const nodes=[],edges=[],endpointIdx=[],timers=[];
+
+  /* === zoom helpers === */
+  function setCellScale(s){
+    currentScale=Math.min(Math.max(s,SCALE_MIN),SCALE_MAX);
+    cell.setAttribute('scale',`${currentScale} ${currentScale} ${currentScale}`);
+  }
+  zoomInBtn.onclick =()=>setCellScale(currentScale*1.2);
+  zoomOutBtn.onclick=()=>setCellScale(currentScale/1.2);
+  window.addEventListener('wheel',e=>setCellScale(currentScale*(e.deltaY<0?1.1:0.9)),{passive:true});
+  let pinchStart=null;
+  window.addEventListener('touchmove',e=>{
+    if(e.touches.length===2){
+      const [a,b]=e.touches,d=Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+      if(pinchStart===null) pinchStart=d;
+      else{setCellScale(currentScale*(d/pinchStart));pinchStart=d;}
+      e.preventDefault();
+    }
+  },{passive:false});
+  window.addEventListener('touchend',()=>pinchStart=null);
+
+  /* === cylinder helper === */
+  function addCylinder(aVec,bVec,radius,color,parent){
+    const mid=aVec.clone().add(bVec).multiplyScalar(0.5);
+    const len=aVec.distanceTo(bVec);
+    const id=`cyl-${Math.random().toString(36).slice(2)}`;
+    parent.insertAdjacentHTML('beforeend',`
+      <a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
+                  radius="${radius}" height="${len}" color="${color}"
+                  material="opacity:0.7;shader:flat"></a-cylinder>`);
+    document.getElementById(id).object3D.quaternion.setFromUnitVectors(
+      new THREE.Vector3(0,1,0),
+      bVec.clone().sub(aVec).normalize()
+    );
+  }
+
+  /* === cube frame, nucleus, DNA, bacterium === */
+  function addOrganelles(){
+    const h=0.8, frame=[
+      [[-h,-h,-h],[-h, h,-h]], [[ h,-h,-h],[ h, h,-h]],
+      [[-h,-h, h],[-h, h, h]], [[ h,-h, h],[ h, h, h]],
+      [[-h, h,-h],[ h, h,-h]], [[ h, h,-h],[ h, h, h]],
+      [[ h, h, h],[-h, h, h]], [[-h, h, h],[-h, h,-h]],
+      [[-h,-h,-h],[ h,-h,-h]], [[ h,-h,-h],[ h,-h, h]],
+      [[ h,-h, h],[-h,-h, h]], [[-h,-h, h],[-h,-h,-h]]];
+    frame.forEach(p=>addCylinder(
+      new THREE.Vector3(...p[0]),new THREE.Vector3(...p[1]),CUBE_RADIUS,'#444',cell));
+
+    const nY=-0.55;
+    cell.insertAdjacentHTML('beforeend',`
+      <a-sphere radius="0.25" position="0 ${nY} 0"
+                material="color:#FFA500;opacity:0.2;transparent:true;side:double"></a-sphere>
+      <a-sphere radius="0.28" position="0 ${nY} 0"
+                material="color:#FFDAB9;opacity:0.1;transparent:true;side:double"></a-sphere>
+      <a-gltf-model src="https://cdn.glitch.global/60126742-7663-452f-915f-363e77f525ab/dna_molecule.glb?v=1680012945899"
+                    scale="0.25 0.25 0.25" position="0 ${nY} 0" rotation="0 45 0"></a-gltf-model>
+    `);
+    cell.insertAdjacentHTML('beforeend',`
+      <a-cylinder id="bacterium" radius="0.12" height="0.36"
+                  color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>`);
+  }
+
+  /* === network generation === */
+  const rnd=(a,b)=>Math.random()*(b-a)+a;
+  function buildNetwork(){
+    cell.innerHTML='';
+    nodes.length=edges.length=endpointIdx.length=0;
+    addOrganelles();
+
+    nodes.push({id:'n0',x:0,y:0.9,z:0,type:'star'});
+    const nC={x:0,y:-0.55,z:0}, dnaR=0.15, dnaH=0.5;
+    for(let i=0;i<N_ENDPOINTS;i++){
+      const ang=(i/(N_ENDPOINTS-1))*Math.PI*3;
+      const yOff=(i/(N_ENDPOINTS-1))*dnaH-dnaH/2;
+      endpointIdx.push(nodes.length);
+      nodes.push({id:`n${nodes.length}`,
+        x:dnaR*Math.cos(ang),y:yOff+nC.y,z:dnaR*Math.sin(ang),type:'endpoint'});
+    }
+    while(nodes.length<N_NODES){
+      const x=rnd(-0.6,0.6),y=rnd(-0.6,0.6),z=rnd(-0.6,0.6);
+      if(Math.hypot(x-nC.x,y-nC.y,z-nC.z)<0.3) continue;
+      nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
+    }
+    nodes.forEach(n=>{
+      const r=n.type==='sphere'?0.04:0.06,
+            c=n.type==='star'?'#00f':n.type==='endpoint'?'#0f0':'#bbb';
+      cell.insertAdjacentHTML('beforeend',
+        `<a-sphere id="${n.id}" radius="${r}" color="${c}"
+                   position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+      n.el=document.getElementById(n.id);
+    });
+    nodes.forEach((n,i)=>{
+      const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
+                       .sort((a,b)=>a.dist-b.dist);
+      let added=0;
+      for(let k=1;k<dists.length&&added<3;k++){
+        const j=dists[k].j;if(j<i)continue;
+        addCylinder(new THREE.Vector3(n.x,n.y,n.z),
+                    new THREE.Vector3(nodes[j].x,nodes[j].y,nodes[j].z),
+                    NETWORK_RADIUS,'#aaa',cell);
+        edges.push({a:i,b:j,el:cell.lastElementChild});
+        added++;
+      }
+    });
+  }
+
+  /* === colour helpers === */
+  function setNodeColour(n,c){ n.el.setAttribute('color',c); }
+  function resetColours(base='#aaa'){
+    nodes.forEach(n=>{
+      let c=base;if(n.type==='star')c='#00f';else if(n.type==='endpoint')c='#0f0';
+      setNodeColour(n,c);
+    });
+    edges.forEach(e=>e.el.setAttribute('color',base));
+  }
+  function resetNetwork(){
+    timers.forEach(clearTimeout);timers.length=0;
+    resetColours();
+    secretePathBtn.disabled=secreteDiffuseBtn.disabled=false;
+    document.querySelectorAll('[id^="prot-"]').forEach(p=>p.remove());
+  }
+
+  /* === propagation algorithms === */
+  function propagatePaths(){
+    resetNetwork();
+    const adj=Array(nodes.length).fill().map(()=>[]);
+    const edgeMap=new Map();
+    edges.forEach((e,i)=>{adj[e.a].push(e.b);adj[e.b].push(e.a);
+      edgeMap.set(`${Math.min(e.a,e.b)}-${Math.max(e.a,e.b)}`,i);});
+    const prev=Array(nodes.length).fill(-1),dist=Array(nodes.length).fill(Infinity),
+          q=[0];dist[0]=0;let found=0;
+    while(q.length&&found<endpointIdx.length){
+      const u=q.shift();
+      adj[u].forEach(v=>{
+        if(dist[v]!==Infinity)return;
+        prev[v]=u;dist[v]=dist[u]+1;q.push(v);
+        if(endpointIdx.includes(v))found++;});
+    }
+    const pathNodes=new Set([0]),pathEdges=new Set();
+    endpointIdx.forEach(ep=>{
+      for(let u=ep;u!==0&&u!==-1;u=prev[u]){
+        pathNodes.add(u);
+        const p=prev[u],k=`${Math.min(u,p)}-${Math.max(u,p)}`;
+        if(edgeMap.has(k))pathEdges.add(edgeMap.get(k));}});
+    const pathDist={},visit=[0];pathNodes.forEach(i=>pathDist[i]=Infinity);pathDist[0]=0;
+    while(visit.length){
+      const u=visit.shift();
+      adj[u].forEach(v=>{
+        if(!pathNodes.has(v)||pathDist[v]!==Infinity)return;
+        const k=`${Math.min(u,v)}-${Math.max(u,v)}`;
+        if(pathEdges.has(edgeMap.get(k))){pathDist[v]=pathDist[u]+1;visit.push(v);} });
+    }
+    const maxStep=Math.max(...Object.values(pathDist));
+    for(let s=0;s<=maxStep;s++){
+      timers.push(setTimeout(()=>{
+        Object.entries(pathDist).forEach(([i,d])=>{
+          if(d===s)setNodeColour(nodes[i],'#f00');});
+        pathEdges.forEach(ei=>{
+          const e=edges[ei];
+          if(pathDist[e.a]<=s&&pathDist[e.b]<=s)e.el.setAttribute('color','#f00');});
+      },s*PROP_INTERVAL));
+    }
+  }
+  function propagateDiffuse(){
+    resetNetwork();
+    const visited=new Set([0]),waves=[[0]];
+    while(waves[waves.length-1].length){
+      const next=[];
+      waves[waves.length-1].forEach(i=>{
+        edges.forEach(e=>{
+          const nb=e.a===i?e.b:e.b===i?e.a:null;
+          if(nb!==null&&!visited.has(nb)){visited.add(nb);next.push(nb);} });});
+      if(next.length)waves.push(next);else break;
+    }
+    waves.forEach((wave,w)=>{
+      timers.push(setTimeout(()=>{
+        wave.forEach(i=>setNodeColour(nodes[i],'#f00'));
+        edges.forEach(e=>{
+          const ca=nodes[e.a].el.getAttribute('color'),
+                cb=nodes[e.b].el.getAttribute('color');
+          if(ca==='#f00'&&cb==='#f00')e.el.setAttribute('color','#f00');});
+      },w*PROP_INTERVAL));
+    });
+  }
+
+  /* === bacterium secretion === */
+  function secreteProtein(){
+    const id=`prot-${secretedCount++}`;
+    cell.insertAdjacentHTML('beforeend',`
+      <a-sphere id="${id}" radius="0.04" color="#f0f"
+                position="1.2 1.0 0"
+                animation="property: position; to: 0 0.9 0; dur:2500;
+                           easing:linear;fill:forwards"></a-sphere>`);
+  }
+
+  /* === lifecycle === */
+  document.querySelector('a-scene').addEventListener('loaded',()=>{
+    buildNetwork();
+    statusTxt.textContent='Ready';
+  });
+
+  /* === button actions === */
+  secretePathBtn.onclick=()=>{
+    secreteProtein();
+    secretePathBtn.disabled=secreteDiffuseBtn.disabled=true;
+    timers.push(setTimeout(propagatePaths,2500));
+  };
+  secreteDiffuseBtn.onclick=()=>{
+    secreteProtein();
+    secretePathBtn.disabled=secreteDiffuseBtn.disabled=true;
+    timers.push(setTimeout(propagateDiffuse,2500));
+  };
+  resetBtn.onclick=resetNetwork;
+  </script>
 </body>
 </html>
