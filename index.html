@@ -40,9 +40,9 @@
   <button id="zoomOutBtn"        class="btn">－</button>
 
   <a-scene embedded arjs="sourceType: webcam; debugUIEnabled:false;">
-    <a-marker id="hiroMarker" preset="hiro" emitevents="true">
-      <a-entity id="cell" visible="false" drag-rotate scale="4 4 4"></a-entity>
-      </a-marker>
+    <a-marker id="customMarker" type="pattern" url="https://github.com/lejlagul/Visegrad_2025/blob/main/hiro_marker.patt" emitevents="true">
+      <a-entity id="cell" visible="false" drag-rotate scale="2 2 2"></a-entity>
+    </a-marker>
     <a-entity camera></a-entity>
   </a-scene>
 
@@ -83,9 +83,9 @@
           resetBtn          = document.getElementById('resetBtn'),
           zoomInBtn         = document.getElementById('zoomInBtn'),
           zoomOutBtn        = document.getElementById('zoomOutBtn'),
-          marker            = document.getElementById('hiroMarker');
+          marker            = document.getElementById('customMarker');
 
-    const N_NODES=150, N_ENDPOINTS=4, PROP_INTERVAL=900,
+    const N_NODES=100, N_ENDPOINTS=4, PROP_INTERVAL=900,
           NETWORK_RADIUS=0.006, CUBE_RADIUS=0.02,
           SCALE_MIN=1, SCALE_MAX=10;
     let currentScale=4, secretedCount=0;
