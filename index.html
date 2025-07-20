@@ -179,7 +179,7 @@
       nodes.push({ id: 'n0', x: 0, y: 0.9, z: 0, type: 'star' });
       const nC = { x: 0, y: -0.55, z: 0 };
       // MODIFICATION 2: Reduced dimensions to fit endpoints inside the nucleus
-      const dnaRadius = 0.1, dnaHeight = 0.3;
+      const dnaRadius = 0.05, dnaHeight = 0.15;
       for (let i = 0; i < N_ENDPOINTS; i++) {
         const angle = (i / (N_ENDPOINTS - 1)) * Math.PI * 3;
         const y_offset = (i / (N_ENDPOINTS - 1)) * dnaHeight - (dnaHeight / 2);
