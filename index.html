@@ -2,16 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>3D Cube-Network (drag-rotate + zoom)</title>
+  <title>3D Cube‑Network (drag‑rotate + zoom)</title>
 
-  <!-- A-Frame core -->
+  <!-- A‑Frame core -->
   <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-  <!-- orbit-controls (for wheel / pinch zoom) -->
+  <!-- Orbit‑controls for wheel / pinch zoom -->
   <script src="https://cdn.jsdelivr.net/npm/aframe-orbit-controls-component@1.3.0/dist/aframe-orbit-controls.min.js"></script>
 
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <style>
-    body {margin:0;overflow:hidden;font-family:monospace}
+    body{margin:0;overflow:hidden;font-family:monospace}
     .btn{
       position:fixed;padding:6px 12px;font:16px monospace;
       background:#222;color:#fff;border:1px solid #888;border-radius:4px;
@@ -27,30 +27,30 @@
 <body>
   <!-- UI buttons -->
   <button id="resetBtn"          class="btn">Reset</button>
-  <button id="secretePathBtn"    class="btn">Secrete & Path</button>
-  <button id="secreteDiffuseBtn" class="btn">Secrete & Diffuse</button>
+  <button id="secretePathBtn"    class="btn">Secrete & Path</button>
+  <button id="secreteDiffuseBtn" class="btn">Secrete & Diffuse</button>
   <button id="zoomInBtn"         class="btn">＋</button>
   <button id="zoomOutBtn"        class="btn">－</button>
 
   <a-scene background="color:#000">
-    <!-- camera (orbit-controls gives us wheel / pinch zoom) -->
+    <!-- Camera: starts farther back (0 0 8) and can’t zoom closer than 4 -->
     <a-entity id="cam"
               camera
-              look-controls="enabled:false"     <!-- disable pointer-lock view -->
-              orbit-controls="target: 0 0 0;    /* stays centred on cube   */
+              look-controls="enabled:false"
+              orbit-controls="target: 0 0 0;
                               enableDamping: true;
                               dampingFactor: 0.1;
                               zoomSpeed: 1.2;
-                              minDistance: 2;
-                              maxDistance: 20;"
-              position="0 0 5">
+                              minDistance: 4;
+                              maxDistance: 25;"
+              position="0 0 8">
     </a-entity>
 
     <!-- lights -->
     <a-entity light="type:ambient;color:#555"></a-entity>
     <a-entity light="type:directional;intensity:0.6" position="1 1 1"></a-entity>
 
-    <!-- the cube model + network parents -->
+    <!-- Cube GLB + network container -->
     <a-entity id="cell"
               gltf-model="url(path/to/your_cube_model.glb)"
               visible="false"
@@ -59,16 +59,16 @@
     </a-entity>
   </a-scene>
 
-  <!-- DRAG-ROTATE COMPONENT -->
+  <!-- drag‑rotate component -->
   <script>
     AFRAME.registerComponent('drag-rotate',{
       schema:{speed:{default:1}},
       init(){
         const cvs=this.el.sceneEl.canvas;
-        let dragging=false, px=0, py=0;
+        let dragging=false,px=0,py=0;
         const start=e=>{dragging=true;px=e.clientX;py=e.clientY;};
         const move=(x,y,f=1)=>{
-          if(!dragging) return;
+          if(!dragging)return;
           const r=this.el.getAttribute('rotation');
           this.el.setAttribute('rotation',{
             x:r.x+(y-py)*f*this.data.speed,
@@ -87,7 +87,7 @@
   </script>
 
   <script>
-    /* ========= handles & constants ========= */
+    /* === handles & constants === */
     const cell              = document.getElementById('cell'),
           cam               = document.getElementById('cam'),
           resetBtn          = document.getElementById('resetBtn'),
@@ -101,7 +101,7 @@
     let secretedCount=0;
     const nodes=[],edges=[],endpointIdx=[],timers=[];
 
-    /* ========= zoom helpers (scale cube, not camera) ========= */
+    /* === zoom buttons (scale cube) === */
     function scaleCube(f){
       const s = cell.object3D.scale.x * f;
       const clamped = THREE.MathUtils.clamp(s,0.5,8);
@@ -109,9 +109,8 @@
     }
     zoomInBtn.onclick  = ()=>scaleCube(1.2);
     zoomOutBtn.onclick = ()=>scaleCube(1/1.2);
-    /* wheel / pinch zoom handled by orbit-controls on the camera */
 
-    /* ========= cylinder helper ========= */
+    /* === cylinder helper === */
     function addCylinder(aVec,bVec,radius,color,parent){
       const mid=aVec.clone().add(bVec).multiplyScalar(0.5);
       const len=aVec.distanceTo(bVec);
@@ -126,40 +125,30 @@
       return id;
     }
 
-    /* ========= network generation ========= */
+    /* === network generation === */
     const rnd=(a,b)=>Math.random()*(b-a)+a;
-
     function buildNetwork(){
-      /* remove any previous spheres / cylinders (keep the GLB) */
       Array.from(cell.children)
         .filter(el=>!el.hasAttribute('gltf-model'))
         .forEach(el=>el.remove());
       nodes.length=edges.length=endpointIdx.length=0;
 
-      /* star node at cube top */
       nodes.push({id:'n0',x:0,y:1,z:0,type:'star'});
-
-      /* endpoints spiralling round cube centre */
       for(let i=0;i<N_ENDPOINTS;i++){
-        const t=i/(N_ENDPOINTS-1);
-        const angle=t*Math.PI*2;
-        nodes.push({
-          id:`n${nodes.length}`,
-          x:0.5*Math.cos(angle),
-          y:-0.5+ t*1.0,
-          z:0.5*Math.sin(angle),
-          type:'endpoint'});
+        const t=i/(N_ENDPOINTS-1),angle=t*Math.PI*2;
+        nodes.push({id:`n${nodes.length}`,
+                    x:0.5*Math.cos(angle),
+                    y:-0.5+t,
+                    z:0.5*Math.sin(angle),
+                    type:'endpoint'});
         endpointIdx.push(nodes.length-1);
       }
-
-      /* random nodes */
       while(nodes.length<N_NODES){
         const x=rnd(-0.8,0.8),y=rnd(-0.8,0.8),z=rnd(-0.8,0.8);
-        if(Math.hypot(x,y,z)<0.25) continue;
+        if(Math.hypot(x,y,z)<0.25)continue;
         nodes.push({id:`n${nodes.length}`,x,y,z,type:'sphere'});
       }
 
-      /* spheres */
       nodes.forEach(n=>{
         const r=n.type==='sphere'?0.04:0.06;
         const c=n.type==='star'?'#0000ff':n.type==='endpoint'?'#00ff00':'#BBBBBB';
@@ -172,7 +161,6 @@
         n.el=sph;
       });
 
-      /* edges */
       nodes.forEach((n,i)=>{
         const dists=nodes.map((m,j)=>({j,dist:Math.hypot(n.x-m.x,n.y-m.y,n.z-m.z)}))
                          .sort((a,b)=>a.dist-b.dist);
@@ -189,8 +177,8 @@
       });
     }
 
-    /* ========= colour helpers / reset ========= */
-    function setNodeColour(n,c){ n.el.setAttribute('color',c); }
+    /* === helpers === */
+    function setNodeColour(n,c){n.el.setAttribute('color',c);}
     function resetColours(base='#AAAAAA'){
       nodes.forEach(n=>{
         let c=base;if(n.type==='star')c='#0000ff';
@@ -200,13 +188,13 @@
       edges.forEach(e=>e.el.setAttribute('color',base));
     }
     function resetNetwork(){
-      timers.forEach(clearTimeout); timers.length=0;
+      timers.forEach(clearTimeout);timers.length=0;
       resetColours();
       secretePathBtn.disabled=secreteDiffuseBtn.disabled=false;
       document.querySelectorAll('[id^="prot-"]').forEach(p=>p.remove());
     }
 
-    /* ========= propagation algorithms (unchanged) ========= */
+    /* === propagate algorithms === */
     function propagatePaths(){
       resetNetwork();
       const adj=Array(nodes.length).fill().map(()=>[]);
@@ -287,7 +275,7 @@
       });
     }
 
-    /* ========= bacterium secretion ========= */
+    /* === bacterium secretion === */
     function secreteProtein(){
       const id=`prot-${secretedCount++}`;
       cell.insertAdjacentHTML('beforeend',
@@ -297,7 +285,7 @@
                               easing: linear; fill: forwards"></a-sphere>`);
     }
 
-    /* ========= life-cycle & wiring ========= */
+    /* === lifecycle === */
     document.querySelector('a-scene').addEventListener('loaded',()=>{
       cell.setAttribute('visible',true);
       buildNetwork();
