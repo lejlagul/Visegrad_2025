@@ -46,7 +46,7 @@ const contactCutoff = 4;              // Å for interface contacts
    1.  Create the NGL Stage
    ─────────────────────────────────────── */
 const stage = new NGL.Stage("viewport",{backgroundColor:"white"});
-let comp, surfaceRepr, interfaceRepr;
+let comp, interfaceRepr;
 
 /* Disable the built‑in dbl‑click‑to‑fullscreen so phones don’t jump */
 stage.viewer.container.addEventListener("dblclick",e=>e.preventDefault(),{capture:true});
@@ -59,33 +59,31 @@ stage.loadFile(pdbPath,{defaultRepresentation:false}).then(o=>{
   stage.autoView();
 });
 
-/* Decide which chains are “long” (bacterial) vs “short” (host) */
+/* Decide which chains are “long” (microbial) vs “short” (host) */
 function splitChainsByLength(struct){
   const chainLengths = {};
   struct.eachChain(c=>{
-    const len = c.residueStore.count;
-    chainLengths[c.chainname] = len;
+    chainLengths[c.chainname] = c.residueStore.count;
   });
 
-  /* Longest = bacterial */
   const maxLen = Math.max(...Object.values(chainLengths));
-  const bactChains = Object.entries(chainLengths)
-                     .filter(([_,len])=>len===maxLen)
-                     .map(([id])=>id);
+  const microbeChains = Object.entries(chainLengths)
+                       .filter(([_,len])=>len===maxLen)
+                       .map(([id])=>id);
   const hostChains = Object.entries(chainLengths)
-                     .filter(([_,len])=>len!==maxLen)
-                     .map(([id])=>id);
+                       .filter(([_,len])=>len!==maxLen)
+                       .map(([id])=>id);
 
   const makeSele = arr => arr.map(c=>":" + c).join(" OR ");
   return {
     hostSele : makeSele(hostChains),
-    bactSele : makeSele(bactChains)
+    bactSele : makeSele(microbeChains)
   };
 }
 
 /* Build the starting cartoon representations */
 function addBaseRepresentations(hostSele,bactSele){
-  comp.addRepresentation("cartoon",{sele:bactSele,color:"gold"});
+  comp.addRepresentation("cartoon",{sele:bactSele,color:"grey"});
   comp.addRepresentation("cartoon",{sele:hostSele,color:"royalblue"});
 }
 
@@ -94,24 +92,22 @@ function addBaseRepresentations(hostSele,bactSele){
    ─────────────────────────────────────── */
 const gui = new dat.GUI({width:260});
 const guiState = { "Interface Contacts": false };
-gui.add(guiState,"Interface Contacts").onChange(show=>{
-  if(show){ enableInterface(); } else{ disableInterface(); }
-});
+gui.add(guiState,"Interface Contacts").onChange(toggleInterface);
 
-function enableInterface(){
-  if(interfaceRepr) return;  // already on
-  const {hostSele,bactSele} = splitChainsByLength(comp.structure);
-  const hostInt  = `(${hostSele}) and within ${contactCutoff} of (${bactSele})`;
-  const bactInt  = `(${bactSele}) and within ${contactCutoff} of (${hostSele})`;
-  interfaceRepr = [
-    comp.addRepresentation("ball+stick",{sele:hostInt,color:"hotpink"}),
-    comp.addRepresentation("ball+stick",{sele:bactInt,color:"yellow"})
-  ];
-}
-function disableInterface(){
-  if(!interfaceRepr) return;
-  interfaceRepr.forEach(r=>r.dispose());
-  interfaceRepr = undefined;
+function toggleInterface(show){
+  if(show){
+    if(interfaceRepr) return;
+    const {hostSele,bactSele} = splitChainsByLength(comp.structure);
+    const hostInt = `(${hostSele}) and within ${contactCutoff} of (${bactSele})`;
+    const bactInt = `(${bactSele}) and within ${contactCutoff} of (${hostSele})`;
+    interfaceRepr = [
+      comp.addRepresentation("ball+stick",{sele:hostInt,color:"hotpink"}),
+      comp.addRepresentation("ball+stick",{sele:bactInt,color:"yellow"})
+    ];
+  }else if(interfaceRepr){
+    interfaceRepr.forEach(r=>r.dispose());
+    interfaceRepr = undefined;
+  }
 }
 
 /* ──────────────────────────────────────────
