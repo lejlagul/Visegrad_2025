@@ -12,109 +12,93 @@
     #viewport{position:absolute;top:0;left:0}
     #help{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-size:14px;z-index:10}
     #info{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-family:monospace;font-size:12px;z-index:10;min-width:200px}
-    .dg{z-index:11}/* keep GUI above canvas */
+    .dg{z-index:11}
   </style>
 </head>
 <body>
 <div id="viewport"></div>
-<div id="help">Drag to rotate · Scroll/pinch to zoom · Click residue for details · Tap for full‑screen</div>
+<div id="help">Drag to rotate · Scroll/pinch to zoom · Click residue for details · Double‑click for full‑screen</div>
 <div id="info">Residue info will appear here</div>
 <script>
   /* ---------------------------------------------------------------------
-     1.  DATA SOURCE
-         – If the original inlined PDB (as Base64) is present (e.g. from
-           your previous af_model.html), we reuse it.
-         – Otherwise we look for a ?pdb= or ?af= query parameter to fetch
-           a remote PDB/AlphaFold file, e.g. …​viewer.html?pdb=6m0j or
-           …​viewer.html?af=Q9BYF1.
+     1.  DATA SOURCE – *always* try the complex you sent
+         – If a global const pdbBase64 is defined we use it (allows manual
+           inlining later).
+         – Otherwise we read the sibling file af_model.html, extract the
+           Base‑64 string that is already there and decode it.
      ------------------------------------------------------------------*/
   async function getPdbBlob(){
-    if(typeof pdbBase64!=='undefined'){
-      const pdbString=atob(pdbBase64);
-      return new Blob([pdbString],{type:'text/plain'});
+    if(typeof pdbBase64!=="undefined"){ // inline override
+      return new Blob([atob(pdbBase64)],{type:"text/plain"});
     }
-    const qs=new URLSearchParams(location.search);
-    const pdbId=qs.get('pdb');
-    const afId=qs.get('af');
-    let url;
-    if(pdbId){
-      url=`https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb`; // RCSB
-    }else if(afId){
-      url=`https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v4.pdb`;
-    }else{
-      alert('No PDB supplied – add ?pdb=XXXX or define pdbBase64.');
-      throw new Error('No structure');
-    }
-    const res=await fetch(url);
-    if(!res.ok)throw new Error('PDB fetch failed');
-    const text=await res.text();
-    return new Blob([text],{type:'text/plain'});
+    try{
+      const res=await fetch("af_model.html");
+      if(res.ok){
+        const html=await res.text();
+        const m=html.match(/const\s+pdbBase64\s*=\s*"([A-Za-z0-9+/=]+)"/);
+        if(m){
+          return new Blob([atob(m[1])],{type:"text/plain"});
+        }
+      }
+    }catch(_){}
+    alert("No embedded PDB found. Please keep af_model.html in the same folder or define const pdbBase64.");
+    throw new Error("No structure");
   }
 
   /* ---------------------------------------------------------------------
      2.  INITIALISE NGL STAGE
      ------------------------------------------------------------------*/
-  const stage=new NGL.Stage('viewport',{backgroundColor:'white'});
-  stage.handleScroll=false; // we zoom via wheel but not page scroll
-
-  stage.tooltips=false; // use our own minimal tooltip
+  const stage=new NGL.Stage("viewport",{backgroundColor:"white"});
+  stage.handleScroll=false;
+  stage.tooltips=false;
 
   /* ---------------------------------------------------------------------
-     3.  CHAIN‑COLOURED CARTOON + INTERACTIVE LAYERS
-         – keeps the original colour scheme (NGL "chainid").
-         – allows toggling of host, microbe, domains, motifs.
+     3.  REPRESENTATIONS & GUI LAYERS (chains, domains, motifs)
      ------------------------------------------------------------------*/
-  const GUI=new dat.GUI({name:'Controls'});
-  const layers={}; // store representations so we can toggle
+  const GUI=new dat.GUI({name:"Controls"});
+  const layers={};
 
   function addChainToggles(comp){
-    const folder=GUI.addFolder('Chains');
-    comp.structure.eachChain(function(chain){
+    const folder=GUI.addFolder("Chains");
+    comp.structure.eachChain(chain=>{
       const sel=`:${chain.chainname}`;
-      const rep=comp.addRepresentation('cartoon',{sele:sel,colorScheme:'chainid'});
+      const rep=comp.addRepresentation("cartoon",{sele:sel,colorScheme:"chainid"});
       layers[`chain_${chain.chainname}`]=rep;
-      const ctrl=folder.add({show:true},'show').name(`Chain ${chain.chainname}`);
+      const ctrl=folder.add({show:true},"show").name(`Chain ${chain.chainname}`);
       ctrl.onChange(v=>rep.setVisibility(v));
     });
     folder.open();
   }
 
-  // Example domain & motif selections – edit as needed
-  const exampleDomains=[{
-    name:'Host LRR Domain',
-    sele:'resi 50-120 and :A',
-    colour:'orange'
-  }];
-  const exampleMotifs=[{
-    name:'Microbe LxCxE Motif',
-    sele:'resi 310-315 and :B',
-    colour:'magenta'
-  }];
+  // ← customise these selectors/colours to your real domain‑motif pairs
+  const exampleDomains=[{name:"Host Domain",sele:"resi 50-120 and :A",colour:"orange"}];
+  const exampleMotifs=[{name:"Microbe Motif",sele:"resi 310-315 and :B",colour:"magenta"}];
+
   function addFeature(folderName,arr,type){
-    if(!arr.length)return;
+    if(!arr.length) return;
     const folder=GUI.addFolder(folderName);
-    arr.forEach(obj=>{
-      const rep=stage.compList[0].addRepresentation(type,{sele:obj.sele,color:obj.colour,opacity:0.8});
-      layers[obj.name]=rep;
-      const ctrl=folder.add({show:true},'show').name(obj.name);
+    arr.forEach(o=>{
+      const rep=stage.compList[0].addRepresentation(type,{sele:o.sele,color:o.colour,opacity:0.8});
+      layers[o.name]=rep;
+      const ctrl=folder.add({show:true},"show").name(o.name);
       ctrl.onChange(v=>rep.setVisibility(v));
     });
   }
 
   /* ---------------------------------------------------------------------
-     4.  RESIDUE CLICK PICKING – show basic info
+     4.  RESIDUE CLICK PICKING
      ------------------------------------------------------------------*/
-  stage.signals.clicked.add(function(px){
-    const div=document.getElementById('info');
+  stage.signals.clicked.add(px=>{
+    const info=document.getElementById("info");
     if(px&&px.atom){
-      div.textContent=`Chain ${px.atom.chainname} · ${px.atom.resname} ${px.atom.resno}`;
+      info.textContent=`Chain ${px.atom.chainname} · ${px.atom.resname} ${px.atom.resno}`;
     }
   });
 
   /* ---------------------------------------------------------------------
      5.  FULL‑SCREEN TOGGLE
      ------------------------------------------------------------------*/
-  document.getElementById('viewport').addEventListener('dblclick',()=>stage.toggleFullscreen());
+  document.getElementById("viewport").addEventListener("dblclick",()=>stage.toggleFullscreen());
 
   /* ---------------------------------------------------------------------
      6.  LOAD & GO
@@ -122,11 +106,11 @@
   (async()=>{
     const blob=await getPdbBlob();
     const url=URL.createObjectURL(blob);
-    stage.loadFile(url,{ext:'pdb',defaultRepresentation:false}).then(comp=>{
+    stage.loadFile(url,{ext:"pdb",defaultRepresentation:false}).then(comp=>{
       comp.autoView();
       addChainToggles(comp);
-      addFeature('Domains',exampleDomains,'surface');
-      addFeature('Motifs',exampleMotifs,'ball+stick');
+      addFeature("Domains",exampleDomains,"surface");
+      addFeature("Motifs",exampleMotifs,"ball+stick");
     });
   })();
 </script>
