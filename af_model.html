@@ -41,21 +41,33 @@ stage.viewer.container.addEventListener("dblclick",e=>e.preventDefault(),{captur
 // Load PDB, then colour chains by length
 stage.loadFile("af_model.pdb",{defaultRepresentation:false}).then(o=>{
    comp=o;
-   const chainLengths = {};
-   o.structure.eachResidue(r=>{
-      const id=r.chainname||r.chain;   // works for mmCIF & PDB
-      chainLengths[id]= (chainLengths[id]||0)+1;
+
+   /* find residue counts for every chain */
+   const chains=[];
+   o.structure.eachChain(cp=>{
+       chains.push({id:cp.chainname||cp.chainid||("CHAININDEX "+cp.index), length:cp.residueCount});
    });
-   // sort chains by residue count (descending)
-   const chains = Object.keys(chainLengths).sort((a,b)=>chainLengths[b]-chainLengths[a]);
-   const microbeSele = chains[0];           // longest chain
-   const hostSele    = chains[chains.length-1]; // shortest (works for 2‑chain complex)
+   if(chains.length<2){
+       alert("Only one chain was detected – the colouring script needs at least two.");
+       return;
+   }
+   chains.sort((a,b)=>b.length-a.length);      // longest first
+   const microbeSele = chains[0].id;
+   const hostSele    = chains[chains.length-1].id;
 
-   // base cartoon reps
-   comp.addRepresentation("cartoon",{sele:hostSele,   color:"steelblue"});
-   comp.addRepresentation("cartoon",{sele:microbeSele,color:"lightgrey"});
+   /* base cartoon reps – NB: uniform colour scheme */
+   comp.addRepresentation("cartoon",{
+       sele:hostSele,
+       colorScheme:"uniform",
+       colorValue :"steelblue"
+   });
+   comp.addRepresentation("cartoon",{
+       sele:microbeSele,
+       colorScheme:"uniform",
+       colorValue :"lightgrey"
+   });
 
-   // store for later use by the GUI toggle
+   // store selections for later (interface toggle)
    comp.parameters._hostSele    = hostSele;
    comp.parameters._microbeSele = microbeSele;
 
@@ -81,8 +93,16 @@ function toggleInterface(show,hostSele,microbeSele,cutoff=4){
       const hostInt  =`(${hostSele}) and within ${cutoff} of (${microbeSele})`;
       const microInt =`(${microbeSele}) and within ${cutoff} of (${hostSele})`;
       interfaceRepr=[
-        comp.addRepresentation("ball+stick",{sele:hostInt, color:"hotpink"}),
-        comp.addRepresentation("ball+stick",{sele:microInt,color:"yellow"})
+        comp.addRepresentation("ball+stick",{
+           sele:hostInt,
+           colorScheme:"uniform",
+           colorValue:"hotpink"
+        }),
+        comp.addRepresentation("ball+stick",{
+           sele:microInt,
+           colorScheme:"uniform",
+           colorValue:"yellow"
+        })
       ];
    }else if(interfaceRepr){
       interfaceRepr.forEach(r=>r.dispose());
