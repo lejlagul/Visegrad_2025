@@ -1,137 +1,131 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Host‑Microbe Complex Viewer</title>
-
-<!-- libs -->
-<script src="https://unpkg.com/ngl@latest/dist/ngl.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dat.gui"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
-<style>
- html,body,#viewport{width:100%;height:100%;margin:0;padding:0;overflow:hidden;}
- #help{
-    position:absolute;top:8px;left:8px;z-index:10;
-    background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;
-    font:14px/1.4 sans-serif;
- }
- @media (max-width:680px){#help{font-size:12px}}
-</style>
+  <meta charset="utf-8">
+  <title>Host–Microbe Protein Viewer</title>
+  <!-- NGL for 3‑D rendering -->
+  <script src="https://unpkg.com/ngl@0.10.5/dist/ngl.js"></script>
+  <!-- dat.GUI for a tiny control panel -->
+  <script src="https://cdn.jsdelivr.net/npm/dat.gui"></script>
+  <!-- FileSaver lets us download PNG snapshots -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    html,body,#viewport{width:100%;height:100%;margin:0;touch-action:manipulation;}
+    #legend{
+      position:absolute;top:8px;left:8px;z-index:10;
+      font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
+    }
+    #legend b{font-weight:600;}
+  </style>
 </head>
 <body>
-
-<div id="viewport"></div>
-<div id="help">
-   <b>Legend:</b> host = blue · microbe = grey<br>
-   Drag / pinch to rotate/zoom · tap 2 atoms → distance · press <kbd>S</kbd> → PNG
-</div>
+  <div id="viewport"></div>
+  <div id="legend">
+    <b>Legend:</b> host&nbsp;=&nbsp;<span style="color:#3773ff">blue</span> · microbe&nbsp;=&nbsp;<span style="color:#888888">grey"</span><br>
+    Drag / pinch to rotate/zoom · tap 2 atoms → distance · press <kbd>S</kbd> → PNG
+  </div>
 
 <script>
-/* ─────────────────────────────────────────
-   1.  Create the stage and load the model
-   ───────────────────────────────────────── */
-const stage = new NGL.Stage("viewport",{backgroundColor:"white"});
-let comp, interfaceRepr;
+// ──────────────────────────────────────────────────────
+//  USER‑EDITABLE SETTINGS
+// ──────────────────────────────────────────────────────
+const pdbPath       = "af_model.pdb";   // make sure the PDB file is in the repo root
+const contactCutoff = 4;                // Å used for interface contacts
 
-// stop the built‑in dbl‑click→fullscreen so mobile dbl‑tap zoom still works
-stage.viewer.container.addEventListener("dblclick",e=>e.preventDefault(),{capture:true});
-
-// Load PDB, then colour chains by length
-stage.loadFile("af_model.pdb",{defaultRepresentation:false}).then(o=>{
-   comp=o;
-
-   /* find residue counts for every chain */
-   const chains=[];
-   o.structure.eachChain(cp=>{
-       chains.push({id:cp.chainname||cp.chainid||("CHAININDEX "+cp.index), length:cp.residueCount});
-   });
-   if(chains.length<2){
-       alert("Only one chain was detected – the colouring script needs at least two.");
-       return;
-   }
-   chains.sort((a,b)=>b.length-a.length);      // longest first
-   const microbeSele = chains[0].id;
-   const hostSele    = chains[chains.length-1].id;
-
-   /* base cartoon reps – NB: uniform colour scheme */
-   comp.addRepresentation("cartoon",{
-       sele:hostSele,
-       colorScheme:"uniform",
-       colorValue :"steelblue"
-   });
-   comp.addRepresentation("cartoon",{
-       sele:microbeSele,
-       colorScheme:"uniform",
-       colorValue :"lightgrey"
-   });
-
-   // store selections for later (interface toggle)
-   comp.parameters._hostSele    = hostSele;
-   comp.parameters._microbeSele = microbeSele;
-
-   stage.autoView();
-   buildGUI();
+// ──────────────────────────────────────────────────────
+//  1.  Create the NGL Stage (fullscreen, mobile‑friendly)
+// ──────────────────────────────────────────────────────
+const stage = new NGL.Stage("viewport", {
+  backgroundColor:"white",
+  cameraType: "perspective"
 });
 
-/* ─────────────────────────────────────────
-   2.  dat.GUI – interface contacts toggle
-   ───────────────────────────────────────── */
-function buildGUI(){
-   const guiState={Interface_Contacts:false};
-   const gui=new dat.GUI({width:200});
-   gui.add(guiState,"Interface_Contacts").onChange(show=>{
-      toggleInterface(show,
-                      comp.parameters._hostSele,
-                      comp.parameters._microbeSele);
-   });
-}
+// Handle Hi‑DPI screenshots and window resizing
+window.addEventListener("resize", () => stage.handleResize());
+stage.setParameters({ quality: "medium" });
 
-function toggleInterface(show,hostSele,microbeSele,cutoff=4){
-   if(show){
-      const hostInt  =`(${hostSele}) and within ${cutoff} of (${microbeSele})`;
-      const microInt =`(${microbeSele}) and within ${cutoff} of (${hostSele})`;
-      interfaceRepr=[
-        comp.addRepresentation("ball+stick",{
-           sele:hostInt,
-           colorScheme:"uniform",
-           colorValue:"hotpink"
-        }),
-        comp.addRepresentation("ball+stick",{
-           sele:microInt,
-           colorScheme:"uniform",
-           colorValue:"yellow"
-        })
-      ];
-   }else if(interfaceRepr){
-      interfaceRepr.forEach(r=>r.dispose());
-      interfaceRepr=undefined;
-   }
-}
+let comp;              // loaded structure component
+let hostSele, microSele; // selections (determined automatically)
+let interfaceRepr;     // will hold contact representation(s)
 
-/* ─────────────────────────────────────────
-   3.  Two‑click distance measurement
-   ───────────────────────────────────────── */
-let picks=[];
-stage.signals.clicked.add(p=>{
-   if(!p||!p.atom)return;
-   picks.push(p.atom);
-   if(picks.length===2){
-      const d=picks[0].distanceTo(picks[1]).toFixed(2);
-      alert(`Distance: ${d} Å`);
-      picks=[];
-   }
+// ──────────────────────────────────────────────────────
+//  2.  Load the structure and colour chains by length
+//      longest chain  → microbe (grey)
+//      shorter chain → host   (blue)
+// ──────────────────────────────────────────────────────
+stage.loadFile(pdbPath, { defaultRepresentation:false }).then(o => {
+  comp = o;
+
+  // ---- 2a.  Detect chain lengths
+  const chains = [];
+  o.structure.eachChain(chain => {
+    const residues = chain.getResidueCount();
+    // Build a robust selection string for THIS chain
+    // Prefer chainname, then chainid, otherwise fall back to index
+    let id = chain.chainname || chain.chainid || chain.index;
+    // NGL selection for a chain is ':' + id (unless id already starts with ':')
+    if(!String(id).startsWith(":")) id = ":" + id;
+    chains.push({ sele:id, count:residues });
+  });
+
+  // Sort by residue count (longest first)
+  chains.sort((a,b) => b.count - a.count);
+  microSele = chains[0]?.sele || "polymer";      // longest = bacterial protein
+  hostSele  = chains[1]?.sele || "not " + microSele; // everything else = host
+
+  // ---- 2b.  Add coloured representations
+  comp.addRepresentation("cartoon", { sele: microSele, color:"#888888" }); // grey
+  comp.addRepresentation("cartoon", { sele: hostSele,  color:"#3773ff" }); // blue
+
+  // initial view
+  stage.autoView();
 });
 
-/* ─────────────────────────────────────────
-   4.  “S” key → hi‑res PNG snapshot
-   ───────────────────────────────────────── */
-window.addEventListener("keydown",e=>{
-   if(e.key.toUpperCase()==="S"){
-      stage.makeImage({trim:true,factor:2})
-           .then(blob=>saveAs(blob,"host_microbe_snapshot.png"));
-   }
+// ──────────────────────────────────────────────────────
+//  3.  dat.GUI – optional interface contacts toggle
+// ──────────────────────────────────────────────────────
+const gui      = new dat.GUI({ width:180 });
+const guiState = { "Interface Contacts": false };
+
+gui.add(guiState, "Interface Contacts").onChange(toggleInterface);
+
+function toggleInterface(show){
+  if(!comp) return; // not yet loaded
+  if(show){
+     const hostInt  = `(${hostSele}) and within ${contactCutoff} of (${microSele})`;
+     const microInt = `(${microSele}) and within ${contactCutoff} of (${hostSele})`;
+     interfaceRepr = [
+       comp.addRepresentation("ball+stick", { sele:hostInt,  color:"hotpink", radius:0.25 }),
+       comp.addRepresentation("ball+stick", { sele:microInt, color:"yellow",  radius:0.25 })
+     ];
+  } else if(interfaceRepr){
+     interfaceRepr.forEach(r => r.dispose());
+     interfaceRepr = undefined;
+  }
+}
+
+// ──────────────────────────────────────────────────────
+//  4.  Two‑click / two‑tap distance measurement
+// ──────────────────────────────────────────────────────
+let picks = [];
+stage.signals.clicked.add(p => {
+  if(!p || !p.atom) return;
+  picks.push(p.atom);
+  if(picks.length === 2){
+     const d = picks[0].distanceTo(picks[1]).toFixed(2);
+     alert(`Distance: ${d} Å`);
+     picks = [];
+  }
+});
+
+// ──────────────────────────────────────────────────────
+//  5.  Hi‑res PNG snapshot on “S” key (or external keyboard)
+// ──────────────────────────────────────────────────────
+window.addEventListener("keydown", e => {
+  if(e.key.toUpperCase() === "S"){
+    stage.makeImage({ trim:true, factor:2 })
+         .then(blob => saveAs(blob, "host_microbe_snapshot.png"));
+  }
 });
 </script>
 </body>
