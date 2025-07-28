@@ -23,8 +23,8 @@
     .btn:disabled { background: #555; color: #999; cursor: not-allowed; }
     #resetBtn          { bottom: 12px; left: 12px; }
     /* Buttons are now visible by default */
-    #secretePathBtn    { bottom: 12px; right: 12px; }
-    #secreteDiffuseBtn { bottom: 56px; right: 12px; }
+    #propagateEndpointsBtn    { bottom: 12px; right: 12px; } /* Renamed button position */
+    #diffuseNetworkBtn { bottom: 56px; right: 12px; } /* Renamed button position */
     #zoomInBtn         { bottom: 12px; left: calc(50% - 34px); }
     #zoomOutBtn        { bottom: 12px; left: calc(50% + 2px); }
     #loader {
@@ -45,6 +45,20 @@
       animation: spin 1s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* New style for node info display */
+    #nodeInfo {
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      padding: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      border-radius: 5px;
+      font-size: 14px;
+      z-index: 1000;
+      display: none; /* Hidden by default */
+    }
   </style>
 </head>
 
@@ -52,19 +66,21 @@
   <div id="loader"><div class="spinner"></div><p style="color:#fff;margin-top:12px">Loading 3D model…</p></div>
 
   <button id="resetBtn"          class="btn">Reset</button>
-  <button id="secretePathBtn"    class="btn">Secrete & Path</button>
-  <button id="secreteDiffuseBtn" class="btn">Secrete & Diffuse</button>
+  <button id="propagateEndpointsBtn"    class="btn">Network Propagation (Focus on Endpoints)</button>
+  <button id="diffuseNetworkBtn" class="btn">Network Diffusion (No Endpoints)</button>
   <button id="zoomInBtn"         class="btn">＋</button>
   <button id="zoomOutBtn"        class="btn">－</button>
 
+  <div id="nodeInfo"></div>
+
   <a-scene background="color: #282828">
     <a-entity id="cell" position="0 0.5 -4" drag-rotate scale="2 2 2"></a-entity>
-    
+
     <a-entity camera position="0 1.6 0"></a-entity>
+    <a-entity cursor="rayOrigin: mouse" raycaster="objects: #cell > a-sphere; far: 100; showLine: true; lineColor: blue; lineOpacity: 0.5;"></a-entity>
   </a-scene>
 
   <script>
-    // This custom component remains unchanged.
     AFRAME.registerComponent('drag-rotate', {
       schema: { speed: { default: 1 } },
       init() {
@@ -95,14 +111,15 @@
 
   <script>
     /* === handles & constants === */
-    // Removed handles for AR marker and status text
-    const cell              = document.getElementById('cell'),
-          loader            = document.getElementById('loader'),
-          secretePathBtn    = document.getElementById('secretePathBtn'),
-          secreteDiffuseBtn = document.getElementById('secreteDiffuseBtn'),
+    const cell          = document.getElementById('cell'),
+          loader          = document.getElementById('loader'),
+          // Updated variable names for buttons
+          propagateEndpointsBtn = document.getElementById('propagateEndpointsBtn'),
+          diffuseNetworkBtn = document.getElementById('diffuseNetworkBtn'),
           resetBtn          = document.getElementById('resetBtn'),
           zoomInBtn         = document.getElementById('zoomInBtn'),
-          zoomOutBtn        = document.getElementById('zoomOutBtn');
+          zoomOutBtn        = document.getElementById('zoomOutBtn'),
+          nodeInfo          = document.getElementById('nodeInfo'); // New handle for node info
 
     const N_NODES = 150, N_ENDPOINTS = 4, PROP_INTERVAL = 900,
           NETWORK_RADIUS = 0.006, CUBE_RADIUS = 0.02,
@@ -110,6 +127,8 @@
     let currentScale = 4, secretedCount = 0;
 
     const nodes = [], edges = [], endpointIdx = [], timers = [];
+
+    let selectedNode = null; // To keep track of the currently selected node
 
     /* === zoom helpers (unchanged) === */
     function setCellScale(s) {
@@ -137,8 +156,8 @@
       const id = `cyl-${Math.random().toString(36).slice(2)}`;
       parent.insertAdjacentHTML('beforeend',
         `<a-cylinder id="${id}" position="${mid.x} ${mid.y} ${mid.z}"
-                    radius="${radius}" height="${len}" color="${color}"
-                    material="opacity:0.7;shader:flat"></a-cylinder>`);
+                      radius="${radius}" height="${len}" color="${color}"
+                      material="opacity:0.7;shader:flat"></a-cylinder>`);
       document.getElementById(id).object3D.quaternion.setFromUnitVectors(
         new THREE.Vector3(0, 1, 0),
         bVec.clone().sub(aVec).normalize()
@@ -161,24 +180,25 @@
       const nY = -0.55;
       cell.insertAdjacentHTML('beforeend',
         `<a-sphere radius="0.25" position="0 ${nY} 0"
-                  material="color:#FFA500;opacity:0.2;transparent:true;side:double"></a-sphere>
+                      material="color:#FFA500;opacity:0.2;transparent:true;side:double"></a-sphere>
         <a-sphere radius="0.28" position="0 ${nY} 0"
-                  material="color:#FFDAB9;opacity:0.1;transparent:true;side:double"></a-sphere>
+                      material="color:#FFDAB9;opacity:0.1;transparent:true;side:double"></a-sphere>
         <a-gltf-model src="https://cdn.glitch.global/60126742-7663-452f-915f-363e77f525ab/dna_molecule.glb?v=1680012945899"
                       scale="0.25 0.25 0.25" position="0 ${nY} 0" rotation="0 45 0"></a-gltf-model>
       `);
       cell.insertAdjacentHTML('beforeend',
         `<a-cylinder id="bacterium" radius="0.12" height="0.36"
-                  color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>`);
+                      color="#35c94a" position="1.2 1.0 0" rotation="90 0 -25"></a-cylinder>`);
     }
 
-    /* === network generation (unchanged) === */
+    /* === network generation (modified for click handling and degree calculation) === */
     const rnd = (a, b) => Math.random() * (b - a) + a;
     function buildNetwork() {
       cell.innerHTML = '';
       nodes.length = edges.length = endpointIdx.length = 0;
       addOrganelles();
-      nodes.push({ id: 'n0', x: 0, y: 0.9, z: 0, type: 'star' });
+      // Initialize nodes with a degree property
+      nodes.push({ id: 'n0', x: 0, y: 0.9, z: 0, type: 'star', originalColor: '#0000ff', degree: 0 });
       const nC = { x: 0, y: -0.55, z: 0 };
       const dnaRadius = 0.15, dnaHeight = 0.5;
       for (let i = 0; i < N_ENDPOINTS; i++) {
@@ -188,54 +208,103 @@
         const y = y_offset + nC.y;
         const z = dnaRadius * Math.sin(angle);
         endpointIdx.push(nodes.length);
-        nodes.push({ id: `n${nodes.length}`, x, y, z, type: 'endpoint' });
+        nodes.push({ id: `n${nodes.length}`, x, y, z, type: 'endpoint', originalColor: '#00ff00', degree: 0 });
       }
       while (nodes.length < N_NODES) {
         const x = rnd(-0.6, 0.6), y = rnd(-0.6, 0.6), z = rnd(-0.6, 0.6);
         if (Math.hypot(x - nC.x, y - nC.y, z - nC.z) < 0.3) continue;
-        nodes.push({ id: `n${nodes.length}`, x, y, z, type: 'sphere' });
+        nodes.push({ id: `n${nodes.length}`, x, y, z, type: 'sphere', originalColor: '#BBBBBB', degree: 0 });
       }
-      nodes.forEach(n => {
+      nodes.forEach((n, i) => {
         const r = n.type === 'sphere' ? 0.04 : 0.06;
         const c = n.type === 'star' ? '#0000ff' : n.type === 'endpoint' ? '#00ff00' : '#BBBBBB';
         cell.insertAdjacentHTML('beforeend',
           `<a-sphere id="${n.id}" radius="${r}" color="${c}"
-                   position="${n.x} ${n.y} ${n.z}"></a-sphere>`);
+                      position="${n.x} ${n.y} ${n.z}" class="network-node" data-node-idx="${i}"></a-sphere>`);
         n.el = document.getElementById(n.id);
       });
+
+      // Populate edges and calculate degrees
       nodes.forEach((n, i) => {
         const dists = nodes.map((m, j) => ({ j, dist: Math.hypot(n.x - m.x, n.y - m.y, n.z - m.z) }))
           .sort((a, b) => a.dist - b.dist);
         let added = 0;
         for (let k = 1; k < dists.length && added < 3; k++) {
           const j = dists[k].j; if (j < i) continue;
-          addCylinder(
+          const cylinderId = addCylinder(
             new THREE.Vector3(n.x, n.y, n.z),
             new THREE.Vector3(nodes[j].x, nodes[j].y, nodes[j].z),
             NETWORK_RADIUS, '#AAAAAA', cell);
-          edges.push({ a: i, b: j, el: cell.lastElementChild });
+          edges.push({ a: i, b: j, el: document.getElementById(cylinderId), originalColor: '#AAAAAA' });
+
+          // Increment degree for both connected nodes
+          nodes[i].degree++;
+          nodes[j].degree++;
           added++;
         }
       });
+
+      // Add click event listeners to nodes
+      nodes.forEach((node, idx) => {
+        node.el.addEventListener('click', () => handleNodeClick(idx));
+      });
     }
 
-    /* === colour helpers (unchanged) === */
+    /* === colour helpers (modified for interaction) === */
     function setNodeColour(n, c) { n.el.setAttribute('color', c); }
     function resetColours(base = '#AAAAAA') {
       nodes.forEach(n => {
-        let c = base; if (n.type === 'star') c = '#0000ff'; else if (n.type === 'endpoint') c = '#00ff00';
-        setNodeColour(n, c);
+        setNodeColour(n, n.originalColor); // Revert to original color
       });
-      edges.forEach(e => e.el.setAttribute('color', base));
+      edges.forEach(e => e.el.setAttribute('color', e.originalColor)); // Revert to original color
+      nodeInfo.style.display = 'none'; // Hide node info on reset
+      selectedNode = null; // Clear selected node
     }
+
     function resetNetwork() {
       timers.forEach(clearTimeout);
       timers.length = 0;
       resetColours();
-      secretePathBtn.disabled = false;
-      secreteDiffuseBtn.disabled = false;
+      propagateEndpointsBtn.disabled = false; // Updated button name
+      diffuseNetworkBtn.disabled = false; // Updated button name
       document.querySelectorAll('[id^="prot-"]').forEach(p => p.remove());
     }
+
+    /* === Interaction handlers (modified to show degree) === */
+    function handleNodeClick(nodeIndex) {
+        const clickedNode = nodes[nodeIndex];
+
+        // If the same node is clicked, deselect it
+        if (selectedNode === clickedNode) {
+            resetColours();
+            selectedNode = null;
+            return;
+        }
+
+        // Reset colors before highlighting new selection
+        resetColours();
+
+        // Highlight the clicked node
+        setNodeColour(clickedNode, '#FFFF00'); // Yellow for selected node
+        selectedNode = clickedNode;
+
+        // Highlight connected edges and nodes
+        edges.forEach(edge => {
+            if (edge.a === nodeIndex || edge.b === nodeIndex) {
+                edge.el.setAttribute('color', '#FF4500'); // Orange-red for connected edges
+                // Highlight the connected node if it's not the clicked one
+                const connectedNodeIndex = edge.a === nodeIndex ? edge.b : edge.a;
+                if (connectedNodeIndex !== nodeIndex) {
+                    setNodeColour(nodes[connectedNodeIndex], '#ADD8E6'); // Light blue for connected nodes
+                }
+            }
+        });
+
+        // Display node information, including degree
+        nodeInfo.innerHTML = `<strong>Node ID:</strong> ${clickedNode.id}<br><strong>Type:</strong> ${clickedNode.type}<br><strong>Degree:</strong> ${clickedNode.degree}`;
+        nodeInfo.style.display = 'block';
+    }
+
 
     /* === propagation algorithms (unchanged) === */
     function propagatePaths() {
@@ -322,30 +391,27 @@
       const startX = 1.2, startY = 1.0, endY = 0.9;
       cell.insertAdjacentHTML('beforeend',
         `<a-sphere id="${id}" radius="0.04" color="#ff00ff" position="${startX} ${startY} 0"
-                  animation="property: position; to: 0 ${endY} 0; dur: 2500;
-                           easing: linear; fill: forwards"></a-sphere>`);
+                      animation="property: position; to: 0 ${endY} 0; dur: 2500;
+                                 easing: linear; fill: forwards"></a-sphere>`);
     }
 
     /* === lifecycle === */
-    // The 'loaded' event now just hides the loader and builds the network.
     document.querySelector('a-scene').addEventListener('loaded', () => {
       loader.style.display = 'none';
       buildNetwork();
     });
 
-    // Removed markerFound and markerLost event listeners.
-
-    /* === button actions (unchanged) === */
-    secretePathBtn.onclick = () => {
+    /* === button actions (updated button names) === */
+    propagateEndpointsBtn.onclick = () => {
       secreteProtein();
-      secretePathBtn.disabled = true;
-      secreteDiffuseBtn.disabled = true;
+      propagateEndpointsBtn.disabled = true;
+      diffuseNetworkBtn.disabled = true;
       timers.push(setTimeout(propagatePaths, 2500));
     };
-    secreteDiffuseBtn.onclick = () => {
+    diffuseNetworkBtn.onclick = () => {
       secreteProtein();
-      secretePathBtn.disabled = true;
-      secreteDiffuseBtn.disabled = true;
+      diffuseNetworkBtn.disabled = true;
+      propagateEndpointsBtn.disabled = true;
       timers.push(setTimeout(propagateDiffuse, 2500));
     };
     resetBtn.onclick = () => resetNetwork();
