@@ -2,124 +2,227 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Interactive Host–Microbe PPI Viewer</title>
+  <title>Interactive AlphaFold Viewer</title>
   <script src="https://unpkg.com/ngl@latest/dist/ngl.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat.gui/0.7.9/dat.gui.min.js"></script>
   <style>
-    html,body,#viewport{width:100%;height:100%;margin:0}
-    #viewport{position:absolute;top:0;left:0}
-    #help{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-size:14px;z-index:10}
-    #info{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-family:monospace;font-size:12px;z-index:10;min-width:220px}
-    .dg{z-index:11}
+    html, body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      font-family: sans-serif;
+      overflow: hidden; /* Hide scrollbars */
+    }
+    #viewport {
+      width: 100%;
+      height: 90%; /* Make space for controls */
+      position: relative;
+    }
+    #controls {
+      padding: 10px;
+      height: 10%;
+      background-color: #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+    #controls div {
+      display: flex;
+      gap: 5px;
+    }
+    button {
+      padding: 8px 12px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      background-color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #e0e0e0;
+    }
+    #selection_info {
+        font-weight: bold;
+        color: #333;
+    }
+    #tooltip {
+      position: absolute;
+      display: none;
+      padding: 5px;
+      background-color: rgba(0, 0, 0, 0.75);
+      color: white;
+      border-radius: 4px;
+      pointer-events: none; /* Allows clicking through the tooltip */
+      font-size: 12px;
+      z-index: 10;
+    }
   </style>
 </head>
 <body>
+
 <div id="viewport"></div>
-<div id="help">Drag to rotate · Scroll/pinch to zoom · Click residue for details · Double‑click for full‑screen</div>
-<div id="info">Residue info will appear here</div>
+<div id="tooltip"></div>
+
+<div id="controls">
+    <div>
+        <strong>Representation:</strong>
+        <button id="cartoonBtn">Cartoon</button>
+        <button id="spacefillBtn">Spacefill</button>
+        <button id="ballstickBtn">Ball+Stick</button>
+    </div>
+    <div>
+        <strong>Color Scheme:</strong>
+        <button id="chainBtn">Chain</button>
+        <button id="residueBtn">Residue</button>
+        <button id="plddtBtn">pLDDT</button>
+    </div>
+    <div id="selection_info">
+        Selection: None
+    </div>
+    <button id="resetViewBtn">Reset View</button>
+</div>
+
 <script>
-  /* ------------------------------------------------------------------
-     1.  DATA SOURCE: prefer inline const pdbBase64, else use af_model.html
-     ------------------------------------------------------------------*/
-  async function getPdbBlob(){
-    if(typeof pdbBase64!=="undefined"){
-      return new Blob([atob(pdbBase64)],{type:"text/plain"});
+  // Your provided PDB data (truncated for brevity)
+  const pdbBase64 = "TU9ERUwgICAgIDEgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKQVRPTSAgICAgIDEgIE4gICBNRVQgQSAgIDEgICAgICA0OC44MTIgLTcwLjQzOCAgMTUuMjAzICAxLjAwIDIwLjU5ICAgICAgICAgICBOICAKQVRPTSAgICAgIDIgIENBICBNRVQgQSAgIDEgICAgICA0OS44NzUgLTcwLjM3NSAgMTYuMjE5ICAxLjAwIDIwLjU5ICAgICAgICAgICBDICAKQVRPTSAgICAgIDMgIEMgICBNRVQgQSAgIDEgICAgICA1MC41NjIgLTY5LjAwMCAgMTYuMjM0ICAxLjAwIDIwLjU5ICAgICAgICAgICBDICAKQVRPTSAgICAgIDQgIENCICBNRVQgQSAgIDEgICAgICA1MC45MDYgLTcxLjQzOCAgMTUuOTYxICAxLjAwIDIwLjU5ICAgICAgICAgICBDICAKQVRPTSAgICAgIDUgIE8gICBNRVQgQSAgIDEgICAgICA1MS4yNTAgLTY4LjY4OCAgMTcuMTg4ICAxLjAwIDIwLjU5ICAgICAgICAgICBPICAKQVRPTSAgICAgIDYgIENHICBNRVQgQSAgIDEgICAgICA1MC42NTYgLTcyLjc1MCAgMTYuNzY2ICAxLjAwIDIwLjU5ICAgICAgICAgICBDICAKQVRPTSAgICAgIDcgIFNEICBNRVQgQSAgIDEgICAgICA1MS45MDYgLTc0LjAwMCAgMTYuNDM4ICAxLjAwIDIwLjU5ICAgICAgICAgICBTICAKQVRPTSAgICAgIDggIENFICBNRVQgQSAgIDEgICAgICA1MS4yODEgLTc1LjM3NSAgMTcuNTAwICAxLjAwIDIwLjU5ICAgICAgICAgICBDICAKQVRPTSAgICAgIDkgIE4gICBBTEEgQSAgIDIgICAgICA1MC40MzggLTY4LjUwMCAgMTUuMjE5ICAxLjAwIDE3LjcwICAgICAgICAgICBOICAKQVRPTSAgICAgMTAgIENBICBBTEEgQSAgIDIgICAgICA1MS4zMTIgLTY3Ljg3NSAgMTQuMjAzICAxLjAwIDE3LjcwICAgICAgICAgICBDICAKQVRPTSAgICAgMTEgIEMgICBBTEEgQSAgIDIgICAgICA1MS41MDAgLTY2LjM3NSAgMTQuNDc3ICAxLjAwIDE3LjcwICAgICAgICAgICBDICAKQVRPTSAgICAgMTIgIENCICBBTEEgQSAgIDIgICAgICA1MC43MTkgLTY4LjEyNSAgMTIuODEyICAxLjAwIDE3LjcwICAgICAgICAgICBDICAKQVRPTSAgICAgMTMgIE8gICBBTEEgQSAgIDIgICAgICA1MC41NjIgLTY1LjYyNSAgMTQuMjgxICAxLjAwIDE3LjcwICAgICAgICAgICBPICAKQVRPTSAgICAgMTQgIE4gICBQSEUgQSAgIDMgICAgICA1Mi4yNTAgLTY2LjAwMCAgMTUuNDkyICAxLjAwIDE4LjM5ICAgICAgICAgICBOICAKQVRPTSAgICAgMTUgIENBICBQSEUgQSAgIDMgICAgICA1Mi41NjIgLTY0LjYzOCAgMTYuNDY5ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMTYgIEMgICBQSEUgQSAgIDMgICAgICA1My4yMTkgLTYzLjc1MCAgMTUuODEyICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMTcgIENCICBQSEUgQSAgIDMgICAgICA1My40NjkgLTY1LjUwMCAgMTcuNTYyICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMTggIE8gICBQSEUgQSAgIDMgICAgICA1My40MzggLTYyLjcxOSAgMTYuNDUzICAxLjAwIDE4LjM5ICAgICAgICAgICBPICAKQVRPTSAgICAgMTkgIENHICBQSEUgQSAgIDMgICAgICA1Mi43ODEgLTY1LjgxMiAgMTguODc1ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjAgIENEMSBQSEUgQSAgIDMgICAgICA1Mi43MTkgLTY0LjgyMiAgMTkuODQ0ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjEgIENEMiBQSEUgQSAgIDMgICAgICA1Mi4xODggLTY3LjAwMCAgMTkuMTI1ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjIgIENFMSBQSEUgQSAgIDMgICAgICA1Mi4wNjIgLTY1LjA2MiAgMjEuMDYyICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjMgIENFMiBQSEUgQSAgIDMgICAgICA1MS41MzEgLTY3LjI1MCAgMjAuMzI4ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjQgIENaICBQSEUgQSAgIDMgICAgICA1MS40NjkgLTY2LjI1MCAgMjEuMjk3ICAxLjAwIDE4LjM5ICAgICAgICAgICBDICAKQVRPTSAgICAgMjUgIE4gICBJTEUgQSAgIDQgICAgICA1My44MTIgLTY0LjE4OCAgMTQuNzU4ICAxLjAwIDE2LjEyICAgICAgICAgICBOICAKQVRPTSAgICAgMjYgIENBICBJTEUgQSAgIDQgICAgICA1NS4xNTYgLTYzLjY1NiAgMTQuNjMzICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMjcgIEMgICBJTEUgQSAgIDQgICAgICA1NS4wOTQgLTYyLjEyNSAgMTQuNTMxICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMjggIENCICBJTEUgQSAgIDQgICAgICA1NS45MDYgLTY0LjI1MCAgMTMuNDA2ICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMjkgIE8gICBJTEUgQSAgIDQgICAgICA1NC4wMzEgLTYxLjU2MiAgMTQuMjQyICAxLjAwIDE2LjEyICAgICAgICAgICBPICAKQVRPTSAgICAgMzAgIENHMSBJTEUgQSAgIDQgICAgICA1Ni4xMjUgLTY1Ljc1MCAgMTMuNTc4ICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMzEgIENHMiBJTEUgQSAgIDQgICAgICA1Ny4yMTkgLTYzLjUwMCAgMTMuMTgwICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMzIgIENEMSBJTEUgQSAgIDQgICAgICA1Ni42ODggLTY2LjQzOCAgMTIuMzUyICAxLjAwIDE2LjEyICAgICAgICAgICBDICAKQVRPTSAgICAgMzMgIE4gICBWQUwgQSAgIDUgICAgICA1NS42MjUgLTYxLjU5NCAgMTMuNTM5ICAxLjAwIDE1Ljk0ICAgICAgICAgICBOICAKQVRPTSAgICAgMzQgIENBICBWQUwgQSAgIDUgICAgICA1Ni45MDYgLTYwLjYzOCAgMTMuMzgzICAxLjAwIDE1Ljk0ICAgICAgICAgICBDICAKQVRPTSAgICAgMzUgIEMgICBWQUwgQSAgIDUgICAgICA1Ni42ODggLTU5LjQzOCAgMTMuMjY2ICAxLjAwIDE1Ljk0ICAgICAgICAgICBDICAKQVRPTSAgICAgMzYgIENCICBWQUwgQSAgIDUgICAgICA1Ny42NTYgLTYxLjQ2OSAgMTIuMTU2ICAxLjAwIDE1LjY0ICAgICAgICAgICBDICAKQVRPTSAgICAgMzcgIE8gICBWQUwgQSAgIDUgICAgICA1Ny4zNDQgLTU4LjY1NiAgMTMuOTg0ICAxLjAwIDE1LjY0ICAgICAgICAgICBPICAKQVRPTSAgICAgMzggIENHMSBWQUwgQSAgIDUgICAgICA1OC45NjkgLTYwLjY4OCAgMTEuOTUzICAx.MC0gMTUuNjQgICAgICAgICAgIENALAEK... (rest of your PDB data)
+" +
+"QVRPTSAgICAxMzIgIENBICBMRVUgQSAgMjAgICAgICAzOC43ODEgLTI2LjEwOSAgMTMuNjE3ICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzMgIEMgICBMRVUgQSAgMjAgICAgICAzOC40MDYgLTI0LjY1NiAgMTMuMjk3ICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzQgIENCICBMRVUgQSAgMjAgICAgICAzOC4wOTQgLTI2LjU0NyAgMTQuOTIyICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzUgIE8gICBMRVUgQSAgMjAgICAgICAzNy4zNzUgLTI0LjQwNiAgMTIuNjgwICAxLjAwIDE4LjIwICAgICAgICAgICBPICAKQVRPTSAgICAxMzYgIENHICBMRVUgQSAgMjAgICAgICAzNy45MDYgLTI4LjA0NyAgMTUuMTA5ICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzcgIENEMSBMRVUgQSAgMjAgICAgICAzNy42ODggLTI4LjM3NSAgMTYuNTk0ICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzggIENEMiBMRVUgQSAgMjAgICAgICAzNi43MTkgLTI4LjUzMSAgMTQuMjgxICAxLjAwIDE4LjIwICAgICAgICAgICBDICAKQVRPTSAgICAxMzkgIE4gICBDWVMgQSAgMjEgICAgICAzOS4xNTYgLTIzLjY4OCAgMTMuODQ0ICAxLjAwIDE4LjY0ICAgICAgICAgICBOICAKQVRPTSAgICAxNDAgIENBICBDWVMgQSAgMjEgICAgICAzOC4yODEgLTIyLjY5NyAgMTQuNTk0ICAxLjAwIDE4LjY0ICAgICAgICAgICBDICAKQVRPTSAgICAxNDEgIEMgICBDWVMgQSAgMjEgICAgICAzNy41NjIgLTIxLjgyOCAgMTMuNjU2ICAxLjAwIDE4LjY0ICAgICAgICAgICBDICAKQVRPTSAgICAxNDIgIENCICBDWVMgQSAgMjEgICAgICAzOS4wOTQgLTIyLjAwMCAgMTUuNjE3ICAxLjAwIDE4LjY0ICAgICAgICAgICBDICAKQVRPTSAgICAxNDMgIE8gICBDWVMgQSAgMjEgICAgICAzNy44NzUgLTIxLjc4MSAgMTIuNDYxICAxLjAwIDE4LjY0ICAgICAgICAgICBPICAKQVRPTSAgICAxNDQgIFNHICBDWVMgQSAgMjEgICAgICAzOS40MDYgLTIyLjYwNiAgMTcuMTU2ICAxLjAwIDE4LjY0ICAgICAgICAgICBTICAKQVRPTSAgICAxNDUgIE4gICBQUk8gQSAgMjIgICAgICAzNy41MDAgLTIwLjQ1MyAgMTQuMDU1ICAxLjAwIDE5LjYxICAgICAgICAgICBOICAKQVRPTSAgICAxNDYgIENBICBQUk8gQSAgMjIgICAgICAzNi40NjkgLTE5LjQyMiAgMTQuMTk1ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNDcgIEMgICBQUk8gQSAgMjIgICAgICAzNi4zNDQgLTE4LjYwOSAgMTIuOTIyICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAgMTQ4ICBDQyBQSEUgQSAgMjIgICAgICAzNi43ODEgLTE4LjUwMCAgMTUuMzgzICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNDkgIE8gICBQUk8gQSAgMjIgICAgICAzNy4yNTAgLTE3Ljg1OSAgMTIuNTU1ICAxLjAwIDE5LjYxICAgICAgICAgICBPICAKQVRPTSAgICAxNTAgIENHICBQUk8gQSAgMjIgICAgICAzNi40MDYgLTE5LjA3OCAgMTYuNzE5ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTEgIENEMSBQSEUgQSAgMjIgICAgICAzNS4wOTQgLTE4LjkzOCAgMTcuMjAzICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTIgIENEMiBQSEUgQSAgMjIgICAgICAzNy4zNDQgLTE5Ljc1MCAgMTcuNDg0ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTMgIENFMSBQSEUgQSAgMjIgICAgICAzNC43NTAgLTE5LjQ2OSAgMTguNDM4ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTQgIENFMiBQSEUgQSAgMjIgICAgICAzNy4wMDAgLTIwLjI4MSAgMTguNzM0ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTUgIENaICBQSEUgQSAgMjIgICAgICAzNS42ODggLTIwLjE0MSAgMTkuMjAzICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNTYgIE4gICBQUk8gQSAgMjMgICAgICAzNS44MTIgLTE5LjA3OCAgMTEuNzM0ICAxLjAwIDIwLjIyICAgICAgICAgICBOICAKQVRPTSAgICAxNTcgIENBICBQUk8gQSAgMjMgICAgICAzNi4wNjIgLTE4LjY0MSAgMTAuMzU5ICAxLjAwIDIwLjIyICAgICAgICAgICBDICAKQVRPTSAgICAxNTggIEMgICBQUk8gQSAgMjMgICAgICAzNS41OTQgLTE3LjIwMyAgMTAuMTA5ICAxLjAwIDIwLjIyICAgICAgICAgICBDICAKQVRPTSAgICAxNTkgIENCICBQUk8gQSAgMjMgICAgICAzNS4yNTAgLTE5LjY0MSAgIDkuNTIzICAxLjAwIDIwLjIyICAgICAgICAgICBDICAKQVRPTSAgICAxNjAgIE8gICBQUk8gQSAgMjMgICAgICAzNC4zNzUgLTE2LjkwNiAgMTAuMjU4ICAxLjAwIDIwLjIyICAgICAgICAgICBPICAKQVRPTSAgICAxNjEgIENHICBQUk8gQSAgMjMgICAgICAzNC4zNDQgLTIwLjMxMiAgMTAuNTA4ICAxLjAwIDIwLjIyICAgICAgICAgICBDICAKQVRPTSAgICAxNjIgIENEICBQUk8gQSAgMjMgICAgICAzNC43MTkgLTE5LjY3NSAgMTEuODkxICAxLjAwIDIwLjIyICAgICAgICAgICBDICAKQVRPTSAgICAxNjMgIE4gICBBU1AgQSAgMjQgICAgICAzNi4zNDQgLTE2LjI4MSAgMTAuNDUzICAxLjAwIDE5LjgxICAgICAgICAgICBOICAKQVRPTSAgICAxNjQgIENBICBBU1AgQSAgMjQgICAgICAzNi4xNTYgLTE0LjgzNiAgMTAuNDY5ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNjUgIEMgICBBU1AgQSAgMjQgICAgICAzNS41MDAgLTE0LjM2NyAgIDkuMTcyICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNjYgIENCICBBU1AgQSAgMjQgICAgICAzNy40NjkgLTE0LjEwMiAgMTAuNjk1ICAxLjAwIDE5LjYxICAgICAgICAgICBDICAKQVRPTSAgICAxNjcgIE8gICBBU1AgQSAgMjQgICAgICAzNS41MDAgLTE1LjA4NiAgIDguMTcyICAxLjAw... (rest of your PDB data)
+";
+
+  const stage = new NGL.Stage("viewport");
+  let proteinComponent;
+  let currentRepresentation = 'cartoon'; // Default representation
+  let currentColorScheme = 'chain'; // Default color scheme
+  let selectionHighlight; // To store the highlight component
+
+  // Handle window resizing
+  window.addEventListener("resize", () => {
+    stage.handleResize();
+  });
+
+  // Function to load and display the protein
+  async function loadProtein() {
+    // Convert base64 PDB to a Blob
+    const pdbBlob = new Blob([atob(pdbBase64)], { type: 'text/plain' });
+    proteinComponent = stage.addComponentFromObject(pdbBlob, { ext: "pdb" });
+
+    proteinComponent.addRepresentation(currentRepresentation, { colorScheme: currentColorScheme });
+    stage.autoView(); // Auto-view the entire protein initially
+  }
+
+  // Function to set representation
+  function setRepresentation(representation, colorScheme) {
+    if (proteinComponent) {
+      proteinComponent.removeAllRepresentations();
+      proteinComponent.addRepresentation(representation, { colorScheme: colorScheme });
+      stage.autoView(); // Ensure the whole protein is in view after changing representation
     }
-    const res=await fetch("af_model.html");
-    if(res.ok){
-      const html=await res.text();
-      const m=html.match(/const\s+pdbBase64\s*=\s*"([A-Za-z0-9+/=]+)"/);
-      if(m) return new Blob([atob(m[1])],{type:"text/plain"});
+  }
+
+  // Function to set color scheme
+  function setColorScheme(colorScheme) {
+    if (proteinComponent) {
+      proteinComponent.removeAllRepresentations();
+      proteinComponent.addRepresentation(currentRepresentation, { colorScheme: colorScheme });
+      stage.autoView(); // Ensure the whole protein is in view after changing color scheme
     }
-    alert("No PDB model found – add const pdbBase64 or keep af_model.html next to this viewer.");
-    throw new Error("No structure");
   }
 
-  /* ------------------------------------------------------------------
-     2.  INIT NGL STAGE
-     ------------------------------------------------------------------*/
-  const stage=new NGL.Stage("viewport",{backgroundColor:"white"});
-  stage.handleScroll=false;
-  stage.tooltips=false;
+  // Initial load
+  loadProtein();
 
-  const GUI=new dat.GUI({name:"Layers"});
-  const layers={};
+  // Control buttons
+  const cartoonBtn = document.getElementById("cartoonBtn");
+  const spacefillBtn = document.getElementById("spacefillBtn");
+  const ballstickBtn = document.getElementById("ballstickBtn");
+  const chainBtn = document.getElementById("chainBtn");
+  const residueBtn = document.getElementById("residueBtn");
+  const plddtBtn = document.getElementById("plddtBtn");
+  const resetViewBtn = document.getElementById("resetViewBtn"); // New button
+  const selectionInfo = document.getElementById("selection_info");
+  const tooltip = document.getElementById("tooltip");
 
-  /* ------------------------------------------------------------------
-     3.  REPRESENTATIONS: Host vs Microbe + Domains & Motifs
-     ------------------------------------------------------------------*/
-  const HOST_COLOR="#1565C0";   // blue
-  const MICROBE_COLOR="#9E9E9E"; // grey
+  cartoonBtn.addEventListener("click", () => {
+    currentRepresentation = 'cartoon';
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
+  spacefillBtn.addEventListener("click", () => {
+    currentRepresentation = 'spacefill';
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
+  ballstickBtn.addEventListener("click", () => {
+    currentRepresentation = 'ball+stick';
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
 
-  function classifyChains(structure){
-    const lengths={};
-    structure.eachResidue(r=>{
-      lengths[r.chainname]=(lengths[r.chainname]||0)+1;
-    });
-    const chainNames=Object.keys(lengths);
-    if(chainNames.length<2) return {host:chainNames[0]||"A",micro:chainNames[0]||"A"};
-    chainNames.sort((a,b)=>lengths[a]-lengths[b]); // ascending
-    return {host:chainNames[0],micro:chainNames[chainNames.length-1]};
-  }
+  chainBtn.addEventListener("click", () => {
+    currentColorScheme = 'chain';
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
+  residueBtn.addEventListener("click", () => {
+    currentColorScheme = 'residue';
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
+  plddtBtn.addEventListener("click", () => {
+    // Assuming pLDDT data is available in the PDB, otherwise, this might not show meaningful colors
+    currentColorScheme = 'bfactor'; // B-factor is often used for pLDDT-like coloring
+    setRepresentation(currentRepresentation, currentColorScheme);
+  });
 
-  // customise with real selections
-  const domainDefs=[{name:"Host Domain",sele:"resi 50-120 and :A",colour:"orange"}];
-  const motifDefs=[{name:"Microbe Motif",sele:"resi 310-315 and :B",colour:"magenta"}];
+  // New Reset View Button Listener
+  resetViewBtn.addEventListener("click", () => {
+    if (selectionHighlight) {
+        proteinComponent.removeRepresentation(selectionHighlight);
+        selectionHighlight = null;
+    }
+    selectionInfo.innerText = "Selection: None";
+    stage.autoView(1000); // Reset camera to view the entire protein
+  });
 
-  function addFeature(folderName,arr,type){
-    if(!arr.length) return;
-    const folder=GUI.addFolder(folderName);
-    arr.forEach(obj=>{
-      const rep=stage.compList[0].addRepresentation(type,{sele:obj.sele,color:obj.colour,opacity:0.9});
-      layers[obj.name]=rep;
-      const ctrl=folder.add({show:true},"show").name(obj.name);
-      ctrl.onChange(v=>rep.setVisibility(v));
-    });
-  }
+  // --- NGL Signal Handling for Hover and Click ---
 
-  /* ------------------------------------------------------------------
-     4.  Residue click picking
-     ------------------------------------------------------------------*/
-  stage.signals.clicked.add(px=>{
-    const div=document.getElementById("info");
-    if(px&&px.atom){
-      div.textContent=`Chain ${px.atom.chainname} · ${px.atom.resname} ${px.atom.resno}`;
+  // Tooltip on Hover
+  stage.signals.hovered.add(function (pickingProxy) {
+    if (pickingProxy && (pickingProxy.atom || pickingProxy.bond)) {
+      var atom = pickingProxy.atom || pickingProxy.closestBondAtom;
+      var residueInfo = `${atom.resname} ${atom.resno}`;
+      tooltip.innerText = residueInfo;
+      tooltip.style.display = "block";
+      tooltip.style.left = (pickingProxy.canvasPosition.x + 10) + 'px';
+      tooltip.style.top = (pickingProxy.canvasPosition.y + 10) + 'px';
+    } else {
+      tooltip.style.display = "none";
     }
   });
 
-  /* ------------------------------------------------------------------
-     5.  Full‑screen toggle
-     ------------------------------------------------------------------*/
-  document.getElementById("viewport").addEventListener("dblclick",()=>stage.toggleFullscreen());
+  // Zoom and Display Info on Click
+  stage.signals.clicked.add(function (pickingProxy) {
+    if (pickingProxy && (pickingProxy.atom || pickingProxy.bond)) {
+        var atom = pickingProxy.atom || pickingProxy.closestBondAtom;
+        var residueInfo = `${atom.resname} ${atom.resno}`;
+        selectionInfo.innerText = "Selection: " + residueInfo;
 
-  /* ------------------------------------------------------------------
-     6.  Load & go
-     ------------------------------------------------------------------*/
-  (async()=>{
-    const pdbBlob=await getPdbBlob();
-    const url=URL.createObjectURL(pdbBlob);
-    stage.loadFile(url,{ext:"pdb",defaultRepresentation:false}).then(comp=>{
-      const {host,micro}=classifyChains(comp.structure);
+        // Clear previous highlight
+        if (selectionHighlight) {
+            proteinComponent.removeRepresentation(selectionHighlight);
+        }
 
-      // Main cartoons
-      const hostRep=comp.addRepresentation("cartoon",{sele:`:${host}`,color:HOST_COLOR});
-      const microRep=comp.addRepresentation("cartoon",{sele:`:${micro}`,color:MICROBE_COLOR});
-      layers["Host (blue)"]=hostRep;
-      layers["Microbe (grey)"]=microRep;
+        // Highlight the selected residue
+        var selectionString = `${atom.resname} and ${atom.resno} and :${atom.chainname}`;
+        selectionHighlight = proteinComponent.addRepresentation("ball+stick", {
+            sele: selectionString,
+            color: "green", // Or any color you prefer for highlighting
+            // You can adjust other parameters like scale, radius for visibility
+        });
 
-      // GUI folder for the two components
-      const mainFolder=GUI.addFolder("Complex");
-      mainFolder.add({show:true},"show").name("Host (blue)").onChange(v=>hostRep.setVisibility(v));
-      mainFolder.add({show:true},"show").name("Microbe (grey)").onChange(v=>microRep.setVisibility(v));
-      mainFolder.open();
-
-      // Domains & motifs overlays
-      addFeature("Domains",domainDefs,"surface");
-      addFeature("Motifs",motifDefs,"ball+stick");
-
-      comp.autoView();
-    });
-  })();
+    } else {
+        selectionInfo.innerText = "Selection: None";
+        // Clear highlight if clicked on empty space
+        if (selectionHighlight) {
+            proteinComponent.removeRepresentation(selectionHighlight);
+            selectionHighlight = null;
+        }
+        stage.autoView(1000); // Reset camera to view the entire protein if clicking on empty space
+    }
+  });
 </script>
 </body>
 </html>
