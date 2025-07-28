@@ -1,132 +1,134 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
   <meta charset="utf-8">
-  <title>Host–Microbe Protein Viewer</title>
+  <title>Interactive Host–Microbe PPI Viewer</title>
   <!-- NGL for 3‑D rendering -->
-  <script src="https://unpkg.com/ngl@0.10.5/dist/ngl.js"></script>
+  <script src="https://unpkg.com/ngl@latest/dist/ngl.js"></script>
   <!-- dat.GUI for a tiny control panel -->
-  <script src="https://cdn.jsdelivr.net/npm/dat.gui"></script>
-  <!-- FileSaver lets us download PNG snapshots -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dat.gui/0.7.9/dat.gui.min.js"></script>
   <style>
-    html,body,#viewport{width:100%;height:100%;margin:0;touch-action:manipulation;}
-    #legend{
-      position:absolute;top:8px;left:8px;z-index:10;
-      font:14px/1.4 -apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;
-    }
-    #legend b{font-weight:600;}
+    html,body,#viewport{width:100%;height:100%;margin:0}
+    #viewport{position:absolute;top:0;left:0}
+    #help{position:absolute;top:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-size:14px;z-index:10}
+    #info{position:absolute;bottom:8px;left:8px;background:rgba(255,255,255,.85);padding:4px 8px;border-radius:4px;font-family:monospace;font-size:12px;z-index:10;min-width:200px}
+    .dg{z-index:11}/* keep GUI above canvas */
   </style>
 </head>
 <body>
-  <div id="viewport"></div>
-  <div id="legend">
-    <b>Legend:</b> host&nbsp;=&nbsp;<span style="color:#3773ff">blue</span> · microbe&nbsp;=&nbsp;<span style="color:#888888">grey"</span><br>
-    Drag / pinch to rotate/zoom · tap 2 atoms → distance · press <kbd>S</kbd> → PNG
-  </div>
-
+<div id="viewport"></div>
+<div id="help">Drag to rotate · Scroll/pinch to zoom · Click residue for details · Tap for full‑screen</div>
+<div id="info">Residue info will appear here</div>
 <script>
-// ──────────────────────────────────────────────────────
-//  USER‑EDITABLE SETTINGS
-// ──────────────────────────────────────────────────────
-const pdbPath       = "af_model.pdb";   // make sure the PDB file is in the repo root
-const contactCutoff = 4;                // Å used for interface contacts
+  /* ---------------------------------------------------------------------
+     1.  DATA SOURCE
+         – If the original inlined PDB (as Base64) is present (e.g. from
+           your previous af_model.html), we reuse it.
+         – Otherwise we look for a ?pdb= or ?af= query parameter to fetch
+           a remote PDB/AlphaFold file, e.g. …​viewer.html?pdb=6m0j or
+           …​viewer.html?af=Q9BYF1.
+     ------------------------------------------------------------------*/
+  async function getPdbBlob(){
+    if(typeof pdbBase64!=='undefined'){
+      const pdbString=atob(pdbBase64);
+      return new Blob([pdbString],{type:'text/plain'});
+    }
+    const qs=new URLSearchParams(location.search);
+    const pdbId=qs.get('pdb');
+    const afId=qs.get('af');
+    let url;
+    if(pdbId){
+      url=`https://files.rcsb.org/download/${pdbId.toUpperCase()}.pdb`; // RCSB
+    }else if(afId){
+      url=`https://alphafold.ebi.ac.uk/files/AF-${afId}-F1-model_v4.pdb`;
+    }else{
+      alert('No PDB supplied – add ?pdb=XXXX or define pdbBase64.');
+      throw new Error('No structure');
+    }
+    const res=await fetch(url);
+    if(!res.ok)throw new Error('PDB fetch failed');
+    const text=await res.text();
+    return new Blob([text],{type:'text/plain'});
+  }
 
-// ──────────────────────────────────────────────────────
-//  1.  Create the NGL Stage (fullscreen, mobile‑friendly)
-// ──────────────────────────────────────────────────────
-const stage = new NGL.Stage("viewport", {
-  backgroundColor:"white",
-  cameraType: "perspective"
-});
+  /* ---------------------------------------------------------------------
+     2.  INITIALISE NGL STAGE
+     ------------------------------------------------------------------*/
+  const stage=new NGL.Stage('viewport',{backgroundColor:'white'});
+  stage.handleScroll=false; // we zoom via wheel but not page scroll
 
-// Handle Hi‑DPI screenshots and window resizing
-window.addEventListener("resize", () => stage.handleResize());
-stage.setParameters({ quality: "medium" });
+  stage.tooltips=false; // use our own minimal tooltip
 
-let comp;              // loaded structure component
-let hostSele, microSele; // selections (determined automatically)
-let interfaceRepr;     // will hold contact representation(s)
+  /* ---------------------------------------------------------------------
+     3.  CHAIN‑COLOURED CARTOON + INTERACTIVE LAYERS
+         – keeps the original colour scheme (NGL "chainid").
+         – allows toggling of host, microbe, domains, motifs.
+     ------------------------------------------------------------------*/
+  const GUI=new dat.GUI({name:'Controls'});
+  const layers={}; // store representations so we can toggle
 
-// ──────────────────────────────────────────────────────
-//  2.  Load the structure and colour chains by length
-//      longest chain  → microbe (grey)
-//      shorter chain → host   (blue)
-// ──────────────────────────────────────────────────────
-stage.loadFile(pdbPath, { defaultRepresentation:false }).then(o => {
-  comp = o;
+  function addChainToggles(comp){
+    const folder=GUI.addFolder('Chains');
+    comp.structure.eachChain(function(chain){
+      const sel=`:${chain.chainname}`;
+      const rep=comp.addRepresentation('cartoon',{sele:sel,colorScheme:'chainid'});
+      layers[`chain_${chain.chainname}`]=rep;
+      const ctrl=folder.add({show:true},'show').name(`Chain ${chain.chainname}`);
+      ctrl.onChange(v=>rep.setVisibility(v));
+    });
+    folder.open();
+  }
 
-  // ---- 2a.  Detect chain lengths
-  const chains = [];
-  o.structure.eachChain(chain => {
-    const residues = chain.getResidueCount();
-    // Build a robust selection string for THIS chain
-    // Prefer chainname, then chainid, otherwise fall back to index
-    let id = chain.chainname || chain.chainid || chain.index;
-    // NGL selection for a chain is ':' + id (unless id already starts with ':')
-    if(!String(id).startsWith(":")) id = ":" + id;
-    chains.push({ sele:id, count:residues });
+  // Example domain & motif selections – edit as needed
+  const exampleDomains=[{
+    name:'Host LRR Domain',
+    sele:'resi 50-120 and :A',
+    colour:'orange'
+  }];
+  const exampleMotifs=[{
+    name:'Microbe LxCxE Motif',
+    sele:'resi 310-315 and :B',
+    colour:'magenta'
+  }];
+  function addFeature(folderName,arr,type){
+    if(!arr.length)return;
+    const folder=GUI.addFolder(folderName);
+    arr.forEach(obj=>{
+      const rep=stage.compList[0].addRepresentation(type,{sele:obj.sele,color:obj.colour,opacity:0.8});
+      layers[obj.name]=rep;
+      const ctrl=folder.add({show:true},'show').name(obj.name);
+      ctrl.onChange(v=>rep.setVisibility(v));
+    });
+  }
+
+  /* ---------------------------------------------------------------------
+     4.  RESIDUE CLICK PICKING – show basic info
+     ------------------------------------------------------------------*/
+  stage.signals.clicked.add(function(px){
+    const div=document.getElementById('info');
+    if(px&&px.atom){
+      div.textContent=`Chain ${px.atom.chainname} · ${px.atom.resname} ${px.atom.resno}`;
+    }
   });
 
-  // Sort by residue count (longest first)
-  chains.sort((a,b) => b.count - a.count);
-  microSele = chains[0]?.sele || "polymer";      // longest = bacterial protein
-  hostSele  = chains[1]?.sele || "not " + microSele; // everything else = host
+  /* ---------------------------------------------------------------------
+     5.  FULL‑SCREEN TOGGLE
+     ------------------------------------------------------------------*/
+  document.getElementById('viewport').addEventListener('dblclick',()=>stage.toggleFullscreen());
 
-  // ---- 2b.  Add coloured representations
-  comp.addRepresentation("cartoon", { sele: microSele, color:"#888888" }); // grey
-  comp.addRepresentation("cartoon", { sele: hostSele,  color:"#3773ff" }); // blue
-
-  // initial view
-  stage.autoView();
-});
-
-// ──────────────────────────────────────────────────────
-//  3.  dat.GUI – optional interface contacts toggle
-// ──────────────────────────────────────────────────────
-const gui      = new dat.GUI({ width:180 });
-const guiState = { "Interface Contacts": false };
-
-gui.add(guiState, "Interface Contacts").onChange(toggleInterface);
-
-function toggleInterface(show){
-  if(!comp) return; // not yet loaded
-  if(show){
-     const hostInt  = `(${hostSele}) and within ${contactCutoff} of (${microSele})`;
-     const microInt = `(${microSele}) and within ${contactCutoff} of (${hostSele})`;
-     interfaceRepr = [
-       comp.addRepresentation("ball+stick", { sele:hostInt,  color:"hotpink", radius:0.25 }),
-       comp.addRepresentation("ball+stick", { sele:microInt, color:"yellow",  radius:0.25 })
-     ];
-  } else if(interfaceRepr){
-     interfaceRepr.forEach(r => r.dispose());
-     interfaceRepr = undefined;
-  }
-}
-
-// ──────────────────────────────────────────────────────
-//  4.  Two‑click / two‑tap distance measurement
-// ──────────────────────────────────────────────────────
-let picks = [];
-stage.signals.clicked.add(p => {
-  if(!p || !p.atom) return;
-  picks.push(p.atom);
-  if(picks.length === 2){
-     const d = picks[0].distanceTo(picks[1]).toFixed(2);
-     alert(`Distance: ${d} Å`);
-     picks = [];
-  }
-});
-
-// ──────────────────────────────────────────────────────
-//  5.  Hi‑res PNG snapshot on “S” key (or external keyboard)
-// ──────────────────────────────────────────────────────
-window.addEventListener("keydown", e => {
-  if(e.key.toUpperCase() === "S"){
-    stage.makeImage({ trim:true, factor:2 })
-         .then(blob => saveAs(blob, "host_microbe_snapshot.png"));
-  }
-});
+  /* ---------------------------------------------------------------------
+     6.  LOAD & GO
+     ------------------------------------------------------------------*/
+  (async()=>{
+    const blob=await getPdbBlob();
+    const url=URL.createObjectURL(blob);
+    stage.loadFile(url,{ext:'pdb',defaultRepresentation:false}).then(comp=>{
+      comp.autoView();
+      addChainToggles(comp);
+      addFeature('Domains',exampleDomains,'surface');
+      addFeature('Motifs',exampleMotifs,'ball+stick');
+    });
+  })();
 </script>
 </body>
 </html>
